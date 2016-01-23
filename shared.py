@@ -16,6 +16,7 @@ def row_generator(data_path):
                 (left_node, right_node) = line[:-1].split()
                 edges.append((int(left_node), int(right_node)))
     num_edges = len(edges)
+    # XXX: max() might be a mistake here, use len(set()) instead?
     num_nodes = max([x[0] for x in edges] + [x[1] for x in edges]) + 1
     return edges, num_edges, num_nodes
 
