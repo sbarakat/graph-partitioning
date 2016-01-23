@@ -5,13 +5,10 @@ import os
 import numpy as np
 import gzip
 
-DATA_DIRECTORY = '/home/sami/py-graph'
-DATA_FILENAME = os.path.join(DATA_DIRECTORY, 'facebook_combined.txt.gz')
-
-def row_generator():
+def row_generator(data_path):
     """This will generate all the edges in the graph."""
     edges = []
-    with gzip.open(DATA_FILENAME, 'rt') as f:
+    with gzip.open(data_path, 'rt') as f:
         for line in f:
             if line.startswith('#'):
                 continue
@@ -74,22 +71,33 @@ def to_undirected(edge_iterable, num_edges, num_nodes, shuffle=True):
     return np.ascontiguousarray(undirected_edges)
 
 
-def get_clean_data(shuffle=True):
+def get_clean_data(data_path, shuffle=True, save_readable=False):
+    data_dir = os.path.dirname(data_path)
+    file_name, _ = os.path.splitext(os.path.basename(data_path))
+
     if shuffle:
-        name = os.path.join(DATA_DIRECTORY, 'LJ-cleaned-shuffled.npy')
+        name = os.path.join(data_dir, file_name + '-cleaned-shuffled.npy')
+        name_readable = os.path.join(data_dir, file_name + '-cleaned-shuffled.txt')
     else:
-        name = os.path.join(DATA_DIRECTORY, 'LJ-cleaned.npy')
+        name = os.path.join(data_dir, file_name + '-cleaned.npy')
+        name_readable = os.path.join(data_dir, file_name + '-cleaned.txt')
 
     if False and os.path.exists(name):
         print('Loading from file {}'.format(name))
         return np.load(name)
     else:
         print('Parsing from zip. Will write to file {}'.format(name), flush=True)
+
         # Lets get the edges into one big array
-        edges, num_edges, num_nodes = row_generator()
+        edges, num_edges, num_nodes = row_generator(data_path)
         edges = to_undirected(edges, num_edges, num_nodes, shuffle=shuffle)
         print('ORIGINAL DIST: {} MIN: {} MAX: {}'.format(np.abs(edges[:,0] - edges[:,1]).mean(), edges.min(), edges.max()))
         np.save(name, edges)
+
+        with open(name_readable, 'w') as r:
+            for e in edges:
+                r.write("{} {}\n".format(e[0], e[1]))
+
         return edges, num_edges, num_nodes
 
 
