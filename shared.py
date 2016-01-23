@@ -94,9 +94,10 @@ def get_clean_data(data_path, shuffle=True, save_readable=False):
         print('ORIGINAL DIST: {} MIN: {} MAX: {}'.format(np.abs(edges[:,0] - edges[:,1]).mean(), edges.min(), edges.max()))
         np.save(name, edges)
 
-        with open(name_readable, 'w') as r:
-            for e in edges:
-                r.write("{} {}\n".format(e[0], e[1]))
+        if save_readable:
+            with open(name_readable, 'w') as r:
+                for e in edges:
+                    r.write("{} {}\n".format(e[0], e[1]))
 
         return edges, num_edges, num_nodes
 
