@@ -123,3 +123,32 @@ def score(assignment, edges):
 
     return (waste, cut_ratio, mismatch)
 
+def fixed_width_print(arr):
+    print("[", end='')
+    for x in range(0, len(arr)):
+        if arr[x] >= 0:
+            print(" ", end='')
+
+        print("{}".format(arr[x]), end='')
+
+        if x != len(arr)-1:
+            print(" ", end='')
+    print("]")
+
+def line_print(assignments):
+    for i in range(0, len(assignments)):
+        for b in range(i, len(assignments)):
+            if assignments[b] != -1:
+                break
+        if b != len(assignments)-1:
+            print("{} ".format(assignments[i]), end='')
+    print()
+
+# write to file
+def write_to_file(filename, assignments):
+    with open(filename, "w") as f:
+        j = 0
+        for a in assignments:
+            f.write("{} {}\n".format(j,a))
+            j += 1
+
