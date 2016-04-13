@@ -21,3 +21,11 @@ Run the notebook:
     source env/bin/activate
     ipython3 notebook graph-partitioning.ipynb
 
+Requirements for networkit
+
+    sudo apt-get install libblas-dev liblapack-dev libatlas-base-dev gfortran
+    pip install scipy
+    pip install tabulate
+    pip install pandas
+    pip install seaborn
+    pip install networkit
