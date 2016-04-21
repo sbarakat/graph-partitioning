@@ -125,18 +125,22 @@ def score(assignment, edges):
 
 
 def print_partitions(assignments, num_partitions, node_weights):
-    print("\nPartitions - nodes (weight):")
-    partition_size_nodes = np.bincount(assignments, minlength=num_partitions).astype(np.float32)
-    partition_size_weights = np.bincount(assignments, weights=node_weights, minlength=num_partitions).astype(np.float32)
-    for p in range(0, num_partitions):
-        print("P{}: {} ({})".format(p, partition_size_nodes[p], partition_size_weights[p]))
 
-    #parts = [0, 0, 0, 0]
-    #for i in range(0, len(assignments)):
-    #    if assignments[i] >= 0:
-    #        parts[assignments[i]] += 1
-    #for p in range(0, len(parts)):
-    #    print("P{}: {}".format(p, parts[p]))
+    if -1 not in assignments:
+        print("\nPartitions - nodes (weight):")
+        partition_size_nodes = np.bincount(assignments, minlength=num_partitions).astype(np.float32)
+        partition_size_weights = np.bincount(assignments, weights=node_weights, minlength=num_partitions).astype(np.float32)
+        for p in range(0, num_partitions):
+            print("P{}: {} ({})".format(p, partition_size_nodes[p], partition_size_weights[p]))
+
+    else:
+        print("\nPartitions - nodes:")
+        parts = [0] * num_partitions
+        for i in range(0, len(assignments)):
+            if assignments[i] >= 0:
+                parts[assignments[i]] += 1
+        for p in range(0, len(parts)):
+            print("P{}: {}".format(p, parts[p]))
 
 
 def fixed_width_print(arr):
