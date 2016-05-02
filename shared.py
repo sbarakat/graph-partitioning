@@ -103,7 +103,14 @@ def get_clean_data(data_path, shuffle=True, save_readable=False):
         return edges, num_edges, num_nodes
 
 
-def score(assignment, edges):
+def bincount_assigned(a, n):
+    parts = [0] * n
+    for i in range(0, len(a)):
+        if a[i] >= 0:
+            parts[a[i]] += 1
+    return parts
+
+def score(assignment, edges, n=None):
     """Compute the score given an assignment of vertices.
 
     N nodes are assigned to clusters 0 to K-1.
@@ -113,7 +120,10 @@ def score(assignment, edges):
 
     Returns: (total wasted bin space, ratio of edges cut)
     """
-    balance = np.bincount(assignment) / len(assignment)
+    if n:
+        balance = np.array(bincount_assigned(assignment, n)) / len(assignment)
+    else:
+        balance = np.bincount(assignment) / len(assignment)
     waste = (np.max(balance) - balance).sum()
 
     left_edge_assignment = assignment.take(edges[:,0])
