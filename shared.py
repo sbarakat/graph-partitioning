@@ -103,11 +103,14 @@ def get_clean_data(data_path, shuffle=True, save_readable=False):
         return edges, num_edges, num_nodes
 
 
-def bincount_assigned(a, n):
+def bincount_assigned(a, n, weights=None):
     parts = [0] * n
     for i in range(0, len(a)):
         if a[i] >= 0:
-            parts[a[i]] += 1
+            if weights:
+                parts[a[i]] += weights[i]
+            else:
+                parts[a[i]] += 1
     return parts
 
 def score(assignment, edges, n=None):
