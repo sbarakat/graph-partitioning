@@ -129,8 +129,8 @@ def score(assignment, edges, n=None):
         balance = np.bincount(assignment) / len(assignment)
     waste = (np.max(balance) - balance).sum()
 
-    left_edge_assignment = assignment.take(edges[:,0])
-    right_edge_assignment = assignment.take(edges[:,1])
+    left_edge_assignment = assignment.take([x[0] for x in edges]) #edges[:,0])
+    right_edge_assignment = assignment.take([x[1] for x in edges]) #edges[:,1])
     mismatch = (left_edge_assignment != right_edge_assignment).sum()
     cut_ratio = mismatch / len(edges)
 
