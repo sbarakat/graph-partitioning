@@ -29,3 +29,8 @@ Requirements for networkit
     pip install pandas
     pip install seaborn
     pip install networkit
+
+Requirements for MaxPerm
+
+    sudo apt-get install libigraph0 libigraph0-dev
+    gcc Main.c MaxPerm.c -I/usr/include/igraph/ -ligraph -lm -o MaxPerm
