@@ -2,6 +2,10 @@
 import argparse
 
 parser = argparse.ArgumentParser(description='Process some integers.')
+parser.add_argument("--data-file", "-i", metavar='F', default="",
+                    help="Input data file")
+parser.add_argument("--output-dir", "-o", metavar='F', default="",
+                    help="Output data directory")
 parser.add_argument("--num-partitions", metavar='N', type=int, default=4,
                     help="Number of shelters.")
 parser.add_argument("--num-iterations", metavar='N', type=int, default=10,
@@ -27,8 +31,8 @@ args = parser.parse_args()
 
 # In[1]:
 
-DATA_FILENAME = "/home/sami/py-graph/data/oneshot_fennel_weights.txt"
-OUTPUT_DIRECTORY = "/home/sami/py-graph/output"
+DATA_FILENAME = args.data_file
+OUTPUT_DIRECTORY = args.output_dir
 
 # Read input file for prediction model
 PREDICTION_MODEL = ""
