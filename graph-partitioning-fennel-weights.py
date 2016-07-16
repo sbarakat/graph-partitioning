@@ -369,7 +369,10 @@ G = nx.freeze(G)
 # In[12]:
 
 import os
+import datetime
+timestamp = datetime.datetime.now().strftime('%H%M%S')
 data_filename,_ = os.path.splitext(os.path.basename(DATA_FILENAME))
+data_filename += "-" + timestamp
 
 # write to GML file
 gml_filename = os.path.join(OUTPUT_DIRECTORY, data_filename + "-graph.gml")
@@ -424,6 +427,7 @@ print("Network Permanence: {}".format(max_perm))
 
 # write metrics to CSV
 data = {
+    "file": timestamp,
     "num_partitions": num_partitions,
     "num_iterations": num_iterations,
     "prediction_model_cut_off": prediction_model_cut_off,
@@ -439,6 +443,7 @@ data = {
     "network_permanence": max_perm
 }
 fieldnames = [
+    "file",
     "num_partitions",
     "num_iterations",
     "prediction_model_cut_off",
