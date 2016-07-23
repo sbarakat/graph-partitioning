@@ -33,4 +33,15 @@ Requirements for networkit
 Requirements for MaxPerm
 
     sudo apt-get install libigraph0 libigraph0-dev
+    cd bin/MaxPerm/
     gcc Main.c MaxPerm.c -I/usr/include/igraph/ -ligraph -lm -o MaxPerm
+
+Requirements for OSLOM2
+
+    cd bin/
+    wget http://www.oslom.org/code/OSLOM2.tar.gz
+    tar -xvzf OSLOM2.tar.gz
+    rm OSLOM2.tar.gz
+    cd OSLOM2/
+    ./compile_all.sh
+
