@@ -537,6 +537,9 @@ public class CommunityQuality {
 
 			while ((tmp = br.readLine()) != null) {
 				tmp = tmp.trim();
+				if (tmp.charAt(0) == '#') {
+					continue;
+				}
 				tmp = tmp.replaceAll("\\s+", " ");
 				nodes = tmp.split(" ");
 
@@ -567,6 +570,9 @@ public class CommunityQuality {
 
 			while ((tmp = br.readLine()) != null) {
 				tmp = tmp.trim();
+				if (tmp.charAt(0) == '#') {
+					continue;
+				}
 				tmp = tmp.replaceAll("\\s+", " ");
 				nodes = tmp.split(" ");
 				Set<Integer> community = new HashSet<Integer>();
@@ -606,6 +612,9 @@ public class CommunityQuality {
 
 			while ((tmp = br.readLine()) != null) {
 				tmp = tmp.trim();
+				if (tmp.charAt(0) == '#') {
+					continue;
+				}
 				tmp = tmp.replaceAll("\\s+", " ");
 				values = tmp.split(" ");
 				int length = values.length;

@@ -1878,6 +1878,9 @@ public class OverlappingCommunityQuality {
 
 			while ((tmp = br.readLine()) != null) {
 				tmp = tmp.trim();
+				if (tmp.charAt(0) == '#') {
+					continue;
+				}
 				tmp = tmp.replaceAll("\\s+", " ");
 				nodes = tmp.split(" ");
 
@@ -1926,6 +1929,9 @@ public class OverlappingCommunityQuality {
 
 			while ((tmp = br.readLine()) != null) {
 				tmp = tmp.trim();
+				if (tmp.charAt(0) == '#') {
+					continue;
+				}
 				tmp = tmp.replaceAll("\\s+", " ");
 				nodes = tmp.split(" ");
 
