@@ -16,10 +16,16 @@ public class OverlappingCommunityQuality {
 	 * @param args
 	 */
 	public static void main(String[] args) {
+
+		if (args.length < 2) {
+			System.out.println("Usage: OverlappingCommunityQuality <networkFile> <discoveredCommunityFile>");
+			System.exit(1);
+		}
+
 		boolean isUnweighted = true;
 		boolean isUndirected = true;
-		String networkFile = "./LFR.txt";
-		String discoveredCommunityFile = "./LFR_overlapping_community.groups";
+		String networkFile = args[0];
+		String discoveredCommunityFile = args[1];
 		String groundTruthCommunityFile = "./LFR_true_community.groups";
 
 		// Please look at the function definition for the value of
