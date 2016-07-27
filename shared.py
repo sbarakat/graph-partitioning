@@ -4,6 +4,9 @@
 import os
 import numpy as np
 import gzip
+import subprocess
+import tempfile
+import shutil
 
 def row_generator(data_path):
     """This will generate all the edges in the graph."""
@@ -175,6 +178,52 @@ def base_metrics(G):
 
     return (edges_cut, steps)
 
+
+def run_max_perm(bin_path, edges_maxperm_filename):
+    max_perm = 0.0
+    temp_dir = tempfile.mkdtemp()
+    with open(edges_maxperm_filename, "r") as edge_file:
+        args = [os.path.join(bin_path, "MaxPerm", "MaxPerm")]
+        retval = subprocess.call(
+            args, cwd=temp_dir, stdin=edge_file,
+            stderr=subprocess.STDOUT)
+    with open(os.path.join(temp_dir, "output.txt"), "r") as fp:
+        for i, line in enumerate(fp):
+            if "Network Permanence" in line:
+                max_perm = line.split()[3]
+                break
+    shutil.rmtree(temp_dir)
+    return max_perm
+
+def run_oslom(bin_path, output_path, data_filename, edges_oslom_filename):
+    temp_dir = tempfile.mkdtemp()
+    oslom_bin = os.path.join(bin_path, "OSLOM2", "oslom_dir")
+    oslom_log = os.path.join(output_path, data_filename + "-oslom.log")
+    oslom_modules = os.path.join(output_path, data_filename + "-oslom-tp.txt")
+    args = [oslom_bin, "-f", edges_oslom_filename, "-w", "-r", "10", "-hr", "50"]
+    with open(oslom_log, "w") as logwriter:
+        retval = subprocess.call(
+            args, cwd=temp_dir,
+            stdout=logwriter, stderr=subprocess.STDOUT)
+    shutil.copy(os.path.join(temp_dir, "tp"), oslom_modules)
+    shutil.rmtree(temp_dir)
+
+    com_qual_path = os.path.join(bin_path, "ComQualityMetric")
+    com_qual_log = os.path.join(output_path, data_filename + "-CommunityQuality.log")
+    args = ["java", "OverlappingCommunityQuality", edges_oslom_filename, oslom_modules]
+    with open(com_qual_log, "w") as logwriter:
+        retval = subprocess.call(
+            args, cwd=com_qual_path,
+            stdout=logwriter, stderr=subprocess.STDOUT)
+
+    with open(com_qual_log, "r") as fp:
+        metrics = {}
+        for line in fp:
+            if ' = ' in line:
+                m = [p.strip() for p in line.split(',')]
+                metrics.update(dict(map(lambda y:y.split(' = '), m)))
+
+    return metrics
 
 def print_partitions(assignments, num_partitions, node_weights):
 
