@@ -17,16 +17,30 @@ public class OverlappingCommunityQuality {
 	 */
 	public static void main(String[] args) {
 
-		if (args.length < 2) {
-			System.out.println("Usage: OverlappingCommunityQuality <networkFile> <discoveredCommunityFile>");
-			System.exit(1);
-		}
-
+		int i = 0;
+		String arg;
 		boolean isUnweighted = true;
 		boolean isUndirected = true;
-		String networkFile = args[0];
-		String discoveredCommunityFile = args[1];
-		String groundTruthCommunityFile = "./LFR_true_community.groups";
+		String networkFile = "";
+		String discoveredCommunityFile = "";
+		String groundTruthCommunityFile = "";
+
+		while (i < args.length && args[i].startsWith("-")) {
+			arg = args[i++];
+			if (arg.equals("-weighted"))
+				isUnweighted = false;
+			if (arg.equals("-directed"))
+				isUndirected = false;
+		}
+		if (args.length < i+2) {
+			System.err.println("Usage: OverlappingCommunityQuality [-weighted] [-directed] <networkFile> <discoveredCommunityFile> [groundTruthCommunityFile]");
+			System.exit(1);
+		}
+		networkFile = args[i++];
+		discoveredCommunityFile = args[i++];
+		if (args.length == i+1) {
+			groundTruthCommunityFile = args[i++];
+		}
 
 		// Please look at the function definition for the value of
 		// belongingVersion and belongingFunVersion
@@ -63,23 +77,25 @@ public class OverlappingCommunityQuality {
 				discoveredCommunityFile, belongingVersion, belongingFunVersion);
 		System.out.println("QovL = " + QovLink);
 
-		double NMI = OverlappingCommunityQuality.computeNMI(
-				discoveredCommunityFile, groundTruthCommunityFile);
-		System.out.println("NMI = " + NMI);
+		if (!groundTruthCommunityFile.isEmpty()) {
+			double NMI = OverlappingCommunityQuality.computeNMI(
+					discoveredCommunityFile, groundTruthCommunityFile);
+			System.out.println("NMI = " + NMI);
 
-		double omega = OverlappingCommunityQuality.computeOmegaIndex(
-				discoveredCommunityFile, groundTruthCommunityFile);
-		System.out.println("Omega = " + omega);
+			double omega = OverlappingCommunityQuality.computeOmegaIndex(
+					discoveredCommunityFile, groundTruthCommunityFile);
+			System.out.println("Omega = " + omega);
 
-		double[] fscore = OverlappingCommunityQuality.computeFscore(
-				discoveredCommunityFile, groundTruthCommunityFile);
-		System.out.println("Precision = " + fscore[0] + ", recall = "
-				+ fscore[1] + ", Fscore = " + fscore[2]);
+			double[] fscore = OverlappingCommunityQuality.computeFscore(
+					discoveredCommunityFile, groundTruthCommunityFile);
+			System.out.println("Precision = " + fscore[0] + ", recall = "
+					+ fscore[1] + ", Fscore = " + fscore[2]);
 
-		double[] f1 = OverlappingCommunityQuality.computeF1(
-				discoveredCommunityFile, groundTruthCommunityFile);
-		System.out.println("Precision = " + f1[0] + ", recall = " + f1[1]
-				+ ", F1 = " + f1[2]);
+			double[] f1 = OverlappingCommunityQuality.computeF1(
+					discoveredCommunityFile, groundTruthCommunityFile);
+			System.out.println("Precision = " + f1[0] + ", recall = " + f1[1]
+					+ ", F1 = " + f1[2]);
+		}
 	}
 
 	/**
