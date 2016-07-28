@@ -378,6 +378,9 @@ timestamp = datetime.datetime.now().strftime('%H%M%S')
 data_filename,_ = os.path.splitext(os.path.basename(DATA_FILENAME))
 data_filename += "-" + timestamp
 
+if not os.path.exists(OUTPUT_DIRECTORY):
+    os.makedirs(OUTPUT_DIRECTORY)
+
 # write to GML file
 gml_filename = os.path.join(OUTPUT_DIRECTORY, data_filename + "-graph.gml")
 print("Writing GML file: {}".format(gml_filename))
@@ -390,47 +393,25 @@ with open(assignments_filename, "w") as outf:
     for i in range(0, len(assignments)):
         outf.write("{}\n".format(assignments[i]))
 
-# write edge list into a file with, tab delimited
-edges_filename = os.path.join(OUTPUT_DIRECTORY, data_filename + "-edges.txt")
-print("Writing edge list: {}".format(edges_filename))
-with open(edges_filename, "w") as outf:
+# write edge list in a format for MaxPerm, tab delimited
+edges_maxperm_filename = os.path.join(OUTPUT_DIRECTORY, data_filename + "-edges-maxperm.txt")
+print("Writing edge list (for MaxPerm): {}".format(edges_maxperm_filename))
+with open(edges_maxperm_filename, "w") as outf:
     outf.write("{}\t{}\n".format(G.number_of_nodes(), G.number_of_edges()))
     for e in G.edges_iter():
         outf.write("{}\t{}\n".format(*e))
-#nx.write_edgelist(G, edges_filename, delimiter='\t', data=False) # number of nodes/edges missing
+
+# write edge list in a format for OSLOM, tab delimited
+edges_oslom_filename = os.path.join(OUTPUT_DIRECTORY, data_filename + "-edges-oslom.txt")
+print("Writing edge list (for OSLOM): {}".format(edges_oslom_filename))
+with open(edges_oslom_filename, "w") as outf:
+    for e in G.edges_iter(data=True):
+        outf.write("{}\t{}\t{}\n".format(e[0], e[1], e[2]["weight"]))
 
 
 # In[13]:
 
-# original scoring algorithm
-scoring = shared.score(assignments, G.edges(), num_partitions)
-
-# edges cut and communication volume
-edges_cut, steps = shared.base_metrics(G)
-
-# MaxPerm
-max_perm = 0.0
-command = './bin/MaxPerm/MaxPerm < ' + edges_filename
-os.system(command)
-with open("./output.txt") as fp:
-    for i, line in enumerate(fp):
-        if "Network Permanence" in line:
-            max_perm = line.split()[3]
-            break
-os.remove("./output.txt")
-
-print("\nMetrics")
-print("-------\n")
-
-print("Edges cut: {}".format(edges_cut))
-#print("Missmatch: {}".format(scoring[2]))
-print("Waste: {}".format(scoring[0]))
-print("Cut ratio: {}".format(scoring[1]))
-print("Communication volume: {}".format(steps))
-print("Network Permanence: {}".format(max_perm))
-
-# write metrics to CSV
-data = {
+metrics = {
     "file": timestamp,
     "num_partitions": num_partitions,
     "num_iterations": num_iterations,
@@ -440,11 +421,6 @@ data = {
     "use_virtual_nodes": use_virtual_nodes,
     "virtual_node_weight": virtual_node_weight,
     "virtual_edge_weight": virtual_edge_weight,
-    "edges_cut": edges_cut,
-    "waste": scoring[0],
-    "cut_ratio": scoring[1],
-    "communication_volume": steps,
-    "network_permanence": max_perm
 }
 fieldnames = [
     "file",
@@ -460,9 +436,55 @@ fieldnames = [
     "waste",
     "cut_ratio",
     "communication_volume",
-    "network_permanence"
+    "network_permanence",
+    "Q",
+    "NQ",
+    "Qds",
+    "intraEdges",
+    "interEdges",
+    "intraDensity",
+    "modularity degree",
+    "conductance",
+    "expansion",
+    "contraction",
+    "fitness",
+    "QovL",
 ]
-    
+
+# original scoring algorithm
+scoring = shared.score(assignments, G.edges(), num_partitions)
+metrics.update({
+    "waste": scoring[0],
+    "cut_ratio": scoring[1],
+})
+
+# edges cut and communication volume
+edges_cut, steps = shared.base_metrics(G)
+metrics.update({
+    "edges_cut": edges_cut,
+    "communication_volume": steps,
+})
+
+# MaxPerm
+max_perm = shared.run_max_perm(edges_maxperm_filename)
+metrics.update({"network_permanence": max_perm})
+
+# Community Quality metrics
+community_metrics = shared.run_community_metrics(OUTPUT_DIRECTORY,
+                                                 data_filename, edges_oslom_filename)
+metrics.update(community_metrics)
+
+print("\nConfig")
+print("-------\n")
+for f in fieldnames[:9]:
+    print("{}: {}".format(f, metrics[f]))
+
+print("\nMetrics")
+print("-------\n")
+for f in fieldnames[9:]:
+    print("{}: {}".format(f, metrics[f]))
+
+# write metrics to CSV
 import csv
 metrics_filename = os.path.join(OUTPUT_DIRECTORY, "metrics.csv")
 if not os.path.exists(metrics_filename):
@@ -471,7 +493,7 @@ if not os.path.exists(metrics_filename):
         csv_writer.writeheader()
 with open(metrics_filename, "a", newline='') as outf:
     csv_writer = csv.DictWriter(outf, fieldnames=fieldnames)
-    csv_writer.writerow(data)
+    csv_writer.writerow(metrics)
 
 
 # In[ ]:
