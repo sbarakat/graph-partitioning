@@ -8,6 +8,8 @@ import subprocess
 import tempfile
 import shutil
 
+BIN_DIRECTORY = os.path.join(os.path.dirname(__file__), "bin")
+
 def row_generator(data_path):
     """This will generate all the edges in the graph."""
     edges = []
@@ -179,11 +181,11 @@ def base_metrics(G):
     return (edges_cut, steps)
 
 
-def run_max_perm(bin_path, edges_maxperm_filename):
+def run_max_perm(edges_maxperm_filename):
     max_perm = 0.0
     temp_dir = tempfile.mkdtemp()
     with open(edges_maxperm_filename, "r") as edge_file:
-        args = [os.path.join(bin_path, "MaxPerm", "MaxPerm")]
+        args = [os.path.join(BIN_DIRECTORY, "MaxPerm", "MaxPerm")]
         retval = subprocess.call(
             args, cwd=temp_dir, stdin=edge_file,
             stderr=subprocess.STDOUT)
@@ -195,7 +197,7 @@ def run_max_perm(bin_path, edges_maxperm_filename):
     shutil.rmtree(temp_dir)
     return max_perm
 
-def run_community_metrics(bin_path, output_path, data_filename, edges_oslom_filename):
+def run_community_metrics(output_path, data_filename, edges_oslom_filename):
     """
     Community Quality metrics
     Use OSLOM to find clusters in edgelist, then run ComQualityMetric to get metrics.
@@ -204,7 +206,7 @@ def run_community_metrics(bin_path, output_path, data_filename, edges_oslom_file
     https://github.com/chenmingming/ComQualityMetric
     """
     temp_dir = tempfile.mkdtemp()
-    oslom_bin = os.path.join(bin_path, "OSLOM2", "oslom_dir")
+    oslom_bin = os.path.join(BIN_DIRECTORY, "OSLOM2", "oslom_dir")
     oslom_log = os.path.join(output_path, data_filename + "-oslom.log")
     oslom_modules = os.path.join(output_path, data_filename + "-oslom-tp.txt")
     args = [oslom_bin, "-f", edges_oslom_filename, "-w", "-r", "10", "-hr", "50"]
@@ -215,7 +217,7 @@ def run_community_metrics(bin_path, output_path, data_filename, edges_oslom_file
     shutil.copy(os.path.join(temp_dir, "tp"), oslom_modules)
     shutil.rmtree(temp_dir)
 
-    com_qual_path = os.path.join(bin_path, "ComQualityMetric")
+    com_qual_path = os.path.join(BIN_DIRECTORY, "ComQualityMetric")
     com_qual_log = os.path.join(output_path, data_filename + "-CommunityQuality.log")
     args = ["java", "OverlappingCommunityQuality", "-weighted", edges_oslom_filename, oslom_modules]
     with open(com_qual_log, "w") as logwriter:
