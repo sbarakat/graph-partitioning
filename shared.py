@@ -195,7 +195,14 @@ def run_max_perm(bin_path, edges_maxperm_filename):
     shutil.rmtree(temp_dir)
     return max_perm
 
-def run_oslom(bin_path, output_path, data_filename, edges_oslom_filename):
+def run_community_metrics(bin_path, output_path, data_filename, edges_oslom_filename):
+    """
+    Community Quality metrics
+    Use OSLOM to find clusters in edgelist, then run ComQualityMetric to get metrics.
+
+    http://www.oslom.org/
+    https://github.com/chenmingming/ComQualityMetric
+    """
     temp_dir = tempfile.mkdtemp()
     oslom_bin = os.path.join(bin_path, "OSLOM2", "oslom_dir")
     oslom_log = os.path.join(output_path, data_filename + "-oslom.log")
@@ -210,7 +217,7 @@ def run_oslom(bin_path, output_path, data_filename, edges_oslom_filename):
 
     com_qual_path = os.path.join(bin_path, "ComQualityMetric")
     com_qual_log = os.path.join(output_path, data_filename + "-CommunityQuality.log")
-    args = ["java", "OverlappingCommunityQuality", edges_oslom_filename, oslom_modules]
+    args = ["java", "OverlappingCommunityQuality", "-weighted", edges_oslom_filename, oslom_modules]
     with open(com_qual_log, "w") as logwriter:
         retval = subprocess.call(
             args, cwd=com_qual_path,
