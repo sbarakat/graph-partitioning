@@ -374,44 +374,12 @@ G = nx.freeze(G)
 
 import os
 import datetime
+
 timestamp = datetime.datetime.now().strftime('%H%M%S')
 data_filename,_ = os.path.splitext(os.path.basename(DATA_FILENAME))
 data_filename += "-" + timestamp
 
-if not os.path.exists(OUTPUT_DIRECTORY):
-    os.makedirs(OUTPUT_DIRECTORY)
-
-# write to GML file
-gml_filename = os.path.join(OUTPUT_DIRECTORY, data_filename + "-graph.gml")
-print("Writing GML file: {}".format(gml_filename))
-nx.write_gml(G, gml_filename)
-
-# write assignments into a file with a single column
-assignments_filename = os.path.join(OUTPUT_DIRECTORY, data_filename + "-assignments.txt")
-print("Writing assignments: {}".format(assignments_filename))
-with open(assignments_filename, "w") as outf:
-    for i in range(0, len(assignments)):
-        outf.write("{}\n".format(assignments[i]))
-
-# write edge list in a format for MaxPerm, tab delimited
-edges_maxperm_filename = os.path.join(OUTPUT_DIRECTORY, data_filename + "-edges-maxperm.txt")
-print("Writing edge list (for MaxPerm): {}".format(edges_maxperm_filename))
-with open(edges_maxperm_filename, "w") as outf:
-    outf.write("{}\t{}\n".format(G.number_of_nodes(), G.number_of_edges()))
-    for e in G.edges_iter():
-        outf.write("{}\t{}\n".format(*e))
-
-# write edge list in a format for OSLOM, tab delimited
-edges_oslom_filename = os.path.join(OUTPUT_DIRECTORY, data_filename + "-edges-oslom.txt")
-print("Writing edge list (for OSLOM): {}".format(edges_oslom_filename))
-with open(edges_oslom_filename, "w") as outf:
-    for e in G.edges_iter(data=True):
-        outf.write("{}\t{}\t{}\n".format(e[0], e[1], e[2]["weight"]))
-
-
-# In[13]:
-
-metrics = {
+graph_metrics = {
     "file": timestamp,
     "num_partitions": num_partitions,
     "num_iterations": num_iterations,
@@ -422,7 +390,7 @@ metrics = {
     "virtual_node_weight": virtual_node_weight,
     "virtual_edge_weight": virtual_edge_weight,
 }
-fieldnames = [
+graph_fieldnames = [
     "file",
     "num_partitions",
     "num_iterations",
@@ -451,49 +419,99 @@ fieldnames = [
     "QovL",
 ]
 
+print("Complete graph with {} nodes".format(G.number_of_nodes()))
+(file_maxperm, file_oslom) = shared.write_graph_files(OUTPUT_DIRECTORY, "{}-all".format(data_filename), G)
+
 # original scoring algorithm
 scoring = shared.score(assignments, G.edges(), num_partitions)
-metrics.update({
+graph_metrics.update({
     "waste": scoring[0],
     "cut_ratio": scoring[1],
 })
 
 # edges cut and communication volume
 edges_cut, steps = shared.base_metrics(G)
-metrics.update({
+graph_metrics.update({
     "edges_cut": edges_cut,
     "communication_volume": steps,
 })
 
 # MaxPerm
-max_perm = shared.run_max_perm(edges_maxperm_filename)
-metrics.update({"network_permanence": max_perm})
+max_perm = shared.run_max_perm(file_maxperm)
+graph_metrics.update({"network_permanence": max_perm})
 
 # Community Quality metrics
 community_metrics = shared.run_community_metrics(OUTPUT_DIRECTORY,
-                                                 data_filename, edges_oslom_filename)
-metrics.update(community_metrics)
+                                                 "{}-all".format(data_filename),
+                                                 file_oslom)
+graph_metrics.update(community_metrics)
 
 print("\nConfig")
 print("-------\n")
-for f in fieldnames[:9]:
-    print("{}: {}".format(f, metrics[f]))
+for f in graph_fieldnames[:9]:
+    print("{}: {}".format(f, graph_metrics[f]))
 
 print("\nMetrics")
 print("-------\n")
-for f in fieldnames[9:]:
-    print("{}: {}".format(f, metrics[f]))
+for f in graph_fieldnames[9:]:
+    print("{}: {}".format(f, graph_metrics[f]))
 
 # write metrics to CSV
-import csv
 metrics_filename = os.path.join(OUTPUT_DIRECTORY, "metrics.csv")
-if not os.path.exists(metrics_filename):
-    with open(metrics_filename, "w", newline='') as outf:
-        csv_writer = csv.DictWriter(outf, fieldnames=fieldnames)
-        csv_writer.writeheader()
-with open(metrics_filename, "a", newline='') as outf:
-    csv_writer = csv.DictWriter(outf, fieldnames=fieldnames)
-    csv_writer.writerow(metrics)
+shared.write_metrics_csv(metrics_filename, graph_fieldnames, graph_metrics)
+
+
+# In[13]:
+
+partition_metrics = {}
+partition_fieldnames = [
+    "file",
+    "partition",
+    "network_permanence",
+    "Q",
+    "NQ",
+    "Qds",
+    "intraEdges",
+    "interEdges",
+    "intraDensity",
+    "modularity degree",
+    "conductance",
+    "expansion",
+    "contraction",
+    "fitness",
+    "QovL",
+]
+
+for p in range(0, num_partitions):
+    partition_metrics = {
+        "file": timestamp,
+        "partition": p
+    }
+
+    nodes = [i for i,x in enumerate(assignments) if x == p]
+    Gsub = G.subgraph(nodes)
+    print("\nPartition {} with {} nodes".format(p, Gsub.number_of_nodes()))
+    print("-----------------------------\n")
+
+    (file_maxperm, file_oslom) = shared.write_graph_files(OUTPUT_DIRECTORY, "{}-p{}".format(data_filename, p), Gsub)
+    
+    # MaxPerm
+    max_perm = shared.run_max_perm(file_maxperm)
+    partition_metrics.update({"network_permanence": max_perm})
+
+    # Community Quality metrics
+    community_metrics = shared.run_community_metrics(OUTPUT_DIRECTORY,
+                                                     "{}-p{}".format(data_filename, p),
+                                                     file_oslom)
+    partition_metrics.update(community_metrics)
+
+    print("\nMetrics")
+    for f in partition_fieldnames:
+        print("{}: {}".format(f, partition_metrics[f]))
+
+    # write metrics to CSV
+    metrics_filename = os.path.join(OUTPUT_DIRECTORY, "metrics-partitions.csv")
+    shared.write_metrics_csv(metrics_filename, partition_fieldnames, partition_metrics)
 
 
 # In[ ]:
