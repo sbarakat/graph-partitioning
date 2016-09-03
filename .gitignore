@@ -1,6 +1,7 @@
 env/
 .ipynb_checkpoints/
 __pycache__/
+bin/OSLOM2/
 output/
 *.swp
 *.class
