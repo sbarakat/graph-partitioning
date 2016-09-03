@@ -10,6 +10,7 @@ Install requirements for iPython3 notebook
     cd /home/nkd26/Desktop/algorithmshop-master/
     virtualenv -p python3 env
     source env/bin/activate
+    pip3 install networkx
     pip3 install ipython[all]
     pip3 install numpy
     pip3 install cython
@@ -23,12 +24,12 @@ Run the notebook:
 
 Requirements for networkit
 
-    sudo apt-get install libblas-dev liblapack-dev libatlas-base-dev gfortran
-    pip install scipy
-    pip install tabulate
-    pip install pandas
-    pip install seaborn
-    pip install networkit
+    sudo apt-get install libblas-dev liblapack-dev libatlas-base-dev gfortran python3-tk
+    pip3 install scipy
+    pip3 install tabulate
+    pip3 install pandas
+    pip3 install seaborn
+    pip3 install networkit
 
 Requirements for MaxPerm
 
