@@ -227,6 +227,11 @@ def run_community_metrics(output_path, data_filename, edges_oslom_filename):
             args, cwd=com_qual_path,
             stdout=logwriter, stderr=subprocess.STDOUT)
 
+    if retval != 0:
+        with open(com_qual_log, "r") as log:
+            e = log.read().replace('\n', '')
+        raise Exception(e)
+
     with open(com_qual_log, "r") as fp:
         metrics = {}
         for line in fp:
