@@ -163,7 +163,6 @@ def load_metis_into_networkx_graph(DATA_FILENAME):
                 # blank line indicates no node weight
                 G.add_nodes_from([i], weight=0.0)
 
-    edges = np.array(G.edges(), dtype=np.int32)
     edge_weights = np.array([x[2]['weight'] for x in G.edges(data=True)], dtype=np.float32)
     node_weights = np.array([x[1]['weight'] for x in G.nodes(data=True)], dtype=np.float32)
 
@@ -172,9 +171,8 @@ def load_metis_into_networkx_graph(DATA_FILENAME):
     assert (m_nodes == len(node_weights))
     assert (m_edges == G.number_of_edges())
     assert (m_edges == len(edge_weights))
-    assert (m_edges == len(edges))
 
-    return (G, edges, edge_weights, node_weights)
+    return (G, edge_weights, node_weights)
 
 
 def bincount_assigned(a, n, weights=None):
