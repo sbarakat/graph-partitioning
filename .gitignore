@@ -2,6 +2,7 @@ env/
 .ipynb_checkpoints/
 __pycache__/
 bin/OSLOM2/
+bin/MaxPerm/
 output/
 *.swp
 *.class
