@@ -9,6 +9,7 @@ import tempfile
 import subprocess
 import numpy as np
 import networkx as nx
+import networkit
 
 BIN_DIRECTORY = os.path.join(os.path.dirname(__file__), "bin")
 
@@ -108,6 +109,72 @@ def get_clean_data(data_path, shuffle=True, save_readable=False):
                     r.write("{} {}\n".format(e[0], e[1]))
 
         return edges, num_edges, num_nodes
+
+
+def load_metis_into_networkx_graph(DATA_FILENAME):
+
+    # Reading data
+    # - neither networkit nor networkx handle node weights
+    # - networkit can read the METIS file format, networkx can't
+    # - networkit does not support extra attributes to nodes or
+    #    edges, however they can be added later when writing to
+    #    a GraphML file format[1]
+    # - networkx support node and edge attributes, so we can keep
+    #    the partition assignment with the node and also support
+    #    virtual nodes without needing to maintain a seperate
+    #    data structure.
+    # - the most sensible method for loading the graph data is to
+    #    read the METIS file with networkit, convert the graph to
+    #    a networkx graph, then read the METIS file once again
+    #    and load the node weights into a networkx node attribute
+    #
+    # Writing data
+    # - to be able to write the output data with the partition
+    #    each node is assigned to, a suitable file format to write
+    #    to is needed
+    # - writing to a METIS file will lose the partition assignments
+    # - if we use networkit to write the data, then the only function
+    #    available is GraphMLWriter()
+    # - networkx provides a richer set of output methods which
+    #    preserve the partition assignment
+    # - using networkit to write GML data causes a loss of edge weights and node weights
+    # - using networkx to write GML data preserves node and edge weights
+    # [1]: https://networkit.iti.kit.edu/data/uploads/docs/NetworKit-Doc/python/html/graphio.html#networkit.graphio.GraphMLWriter
+
+    # read METIS file
+    nkG = networkit.graphio.METISGraphReader().read(DATA_FILENAME)
+
+    # convert to networkx Graph
+    G = networkit.nxadapter.nk2nx(nkG)
+
+    # add node weights from METIS file
+    with open(DATA_FILENAME, "r") as metis:
+
+        # read meta data from first line
+        first_line = next(metis).split()
+        m_nodes = int(first_line[0])
+        m_edges = int(first_line[1])
+
+        for i, line in enumerate(metis):
+            if line.strip():
+                weight = line.split()[0]
+                G.add_nodes_from([i], weight=str(weight))
+            else:
+                # blank line indicates no node weight
+                G.add_nodes_from([i], weight=0.0)
+
+    edges = np.array(G.edges(), dtype=np.int32)
+    edge_weights = np.array([x[2]['weight'] for x in G.edges(data=True)], dtype=np.float32)
+    node_weights = np.array([x[1]['weight'] for x in G.nodes(data=True)], dtype=np.float32)
+
+    # sanity check
+    assert (m_nodes == G.number_of_nodes())
+    assert (m_nodes == len(node_weights))
+    assert (m_edges == G.number_of_edges())
+    assert (m_edges == len(edge_weights))
+    assert (m_edges == len(edges))
+
+    return (G, edges, edge_weights, node_weights)
 
 
 def bincount_assigned(a, n, weights=None):
