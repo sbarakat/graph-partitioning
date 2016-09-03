@@ -1,0 +1,14 @@
+# ipython notebook
+networkx==1.11
+ipython[all]
+numpy==1.11.1
+Cython==0.24.1
+matplotlib==1.5.2
+
+# networkit
+scipy==0.18.0
+tabulate==0.7.5
+pandas==0.18.1
+seaborn==0.7.1
+networkit==4.1.1
+

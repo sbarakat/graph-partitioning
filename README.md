@@ -1,35 +1,28 @@
 
-Ensure these are removed:
+Initial setup notes
 
+    # ensure these are removed
     sudo apt-get purge ipython3 ipython3-notebook
 
-Install requirements for iPython3 notebook
-
+    # requirements for python3 notebook
     sudo apt-get install python3-dev python3-pip build-essential libzmq3-dev libpng-dev libjpeg8-dev libfreetype6-dev
+
+    # requirements for networkit
+    sudo apt-get install libblas-dev liblapack-dev libatlas-base-dev gfortran python3-tk
     sudo pip3 install virtualenv
-    cd /home/nkd26/Desktop/algorithmshop-master/
+
+    # clone git repo and build
+    git clone https://github.com/sbarakat/algorithmshop-graph-partitioning.git
+    cd algorithmshop-graph-partitioning/
     virtualenv -p python3 env
     source env/bin/activate
-    pip3 install networkx
-    pip3 install ipython[all]
-    pip3 install numpy
-    pip3 install cython
-    pip3 install matplotlib
+    pip3 install -r requirements.txt
 
 Run the notebook:
 
-    cd /home/nkd26/Desktop/algorithmshop-master/
+    cd algorithmshop-graph-partitioning/
     source env/bin/activate
-    ipython3 notebook graph-partitioning.ipynb
-
-Requirements for networkit
-
-    sudo apt-get install libblas-dev liblapack-dev libatlas-base-dev gfortran python3-tk
-    pip3 install scipy
-    pip3 install tabulate
-    pip3 install pandas
-    pip3 install seaborn
-    pip3 install networkit
+    ipython3 notebook graph-partitioning-fennel.ipynb
 
 Requirements for MaxPerm
 
@@ -45,4 +38,10 @@ Requirements for OSLOM2
     rm OSLOM2.tar.gz
     cd OSLOM2/
     ./compile_all.sh
+
+Requirements for ComQualityMetric
+
+    cd bin/ComQualityMetric/
+    javac OverlappingCommunityQuality.java
+    javac CommunityQuality.java
 
