@@ -214,23 +214,26 @@ def read_metis(DATA_FILENAME):
                         assert False, "File format not supported"
                 continue
 
-            n += 1
+            # METIS starts node count from 1, here we start from 0 by
+            # subtracting 1 in the edge list and incrementing 'n' after
+            # processing the line.
             if line.strip():
                 e = line.split()
                 if len(e) > 2:
                     # create weighted edge list:
                     #  [(1, 2, {'weight':'2'}), (1, 3, {'weight':'8'})]
                     edges_split = list(zip(*[iter(e[1:])] * 2))
-                    edge_list = [(n, int(v[0]), {'weight':float(v[1])}) for v in edges_split]
+                    edge_list = [(n, int(v[0]) - 1, {'weight': int(v[1])}) for v in edges_split]
 
                     G.add_edges_from(edge_list)
-                    G.node[n]['weight'] = float(e[0])
+                    G.node[n]['weight'] = int(e[0])
                 else:
                     # no edges
-                    G.add_nodes_from([n], weight=str(e[0]))
+                    G.add_nodes_from([n], weight=int(e[0]))
             else:
                 # blank line indicates no node weight
-                G.add_nodes_from([n], weight=0.0)
+                G.add_nodes_from([n], weight=int(0))
+            n += 1
 
     edge_weights = np.array([x[2]['weight'] for x in G.edges(data=True)], dtype=np.float32)
 
