@@ -165,15 +165,13 @@ def load_metis_into_networkx_graph(DATA_FILENAME):
                 G.add_nodes_from([i], weight=0.0)
 
     edge_weights = np.array([x[2]['weight'] for x in G.edges(data=True)], dtype=np.float32)
-    node_weights = np.array([x[1]['weight'] for x in G.nodes(data=True)], dtype=np.float32)
 
     # sanity check
     assert (m_nodes == G.number_of_nodes())
-    assert (m_nodes == len(node_weights))
     assert (m_edges == G.number_of_edges())
     assert (m_edges == len(edge_weights))
 
-    return (G, edge_weights, node_weights)
+    return (G, edge_weights)
 
 def read_metis(DATA_FILENAME):
 
@@ -235,28 +233,29 @@ def read_metis(DATA_FILENAME):
                 G.add_nodes_from([n], weight=0.0)
 
     edge_weights = np.array([x[2]['weight'] for x in G.edges(data=True)], dtype=np.float32)
-    node_weights = np.array([x[1]['weight'] for x in G.nodes(data=True)], dtype=np.float32)
 
     # sanity check
     assert (m_nodes == G.number_of_nodes())
-    assert (m_nodes == len(node_weights))
     assert (m_edges == G.number_of_edges())
     assert (m_edges == len(edge_weights))
 
-    return (G, edge_weights, node_weights)
+    return (G, edge_weights)
 
 
-def bincount_assigned(a, n, weights=None):
-    parts = [0] * n
-    for i in range(0, len(a)):
-        if a[i] >= 0:
-            if weights:
-                parts[a[i]] += weights[i]
-            else:
-                parts[a[i]] += 1
+def bincount_assigned(graph, assignments, num_partitions):
+    parts = [0] * num_partitions
+    for n in graph.nodes_iter(data=True):
+        node = n[0]
+        if 'weight' in n[1]:
+            weight = n[1]['weight']
+        else:
+            weight = 1
+        if assignments[node] >= 0:
+            parts[assignments[node]] += weight
+
     return parts
 
-def score(assignment, edges, n=None):
+def score(graph, assignment, num_partitions=None):
     """Compute the score given an assignment of vertices.
 
     N nodes are assigned to clusters 0 to K-1.
@@ -266,16 +265,16 @@ def score(assignment, edges, n=None):
 
     Returns: (total wasted bin space, ratio of edges cut)
     """
-    if n:
-        balance = np.array(bincount_assigned(assignment, n)) / len(assignment)
+    if num_partitions:
+        balance = np.array(bincount_assigned(graph, assignment, num_partitions)) / len(assignment)
     else:
         balance = np.bincount(assignment) / len(assignment)
     waste = (np.max(balance) - balance).sum()
 
-    left_edge_assignment = assignment.take([x[0] for x in edges]) #edges[:,0])
-    right_edge_assignment = assignment.take([x[1] for x in edges]) #edges[:,1])
+    left_edge_assignment = assignment.take([x[0] for x in graph.edges()]) #edges[:,0])
+    right_edge_assignment = assignment.take([x[1] for x in graph.edges()]) #edges[:,1])
     mismatch = (left_edge_assignment != right_edge_assignment).sum()
-    cut_ratio = mismatch / len(edges)
+    cut_ratio = mismatch / len(graph.edges())
 
     return (waste, cut_ratio, mismatch)
 
@@ -377,12 +376,12 @@ def run_community_metrics(output_path, data_filename, edges_oslom_filename):
 
     return metrics
 
-def print_partitions(assignments, num_partitions, node_weights):
+def print_partitions(graph, assignments, num_partitions):
 
     if -1 not in assignments:
         print("\nPartitions - nodes (weight):")
         partition_size_nodes = np.bincount(assignments, minlength=num_partitions).astype(np.float32)
-        partition_size_weights = np.bincount(assignments, weights=node_weights, minlength=num_partitions).astype(np.float32)
+        partition_size_weights = bincount_assigned(graph, assignments, num_partitions)
         for p in range(0, num_partitions):
             print("P{}: {} ({})".format(p, partition_size_nodes[p], partition_size_weights[p]))
 
