@@ -1,5 +1,7 @@
-
+import os
+import shared
 import argparse
+import networkx as nx
 
 parser = argparse.ArgumentParser(description='Process some integers.')
 parser.add_argument("--data-file", "-i", metavar='F', default="",
@@ -25,17 +27,27 @@ parser.add_argument("--virtual_edge_weight", metavar='N', type=float, default=1.
 args = parser.parse_args()
 
 
-
-
 # coding: utf-8
 
 # In[1]:
 
+#pwd = get_ipython().magic('pwd')
+
+#DATA_FILENAME = os.path.join(pwd, "data", "oneshot_fennel_weights.txt")
+#OUTPUT_DIRECTORY = os.path.join(pwd, "output")
+
 DATA_FILENAME = args.data_file
 OUTPUT_DIRECTORY = args.output_dir
 
-# Read input file for prediction model
+# Read input file for prediction model, if not provided a prediction
+# model is made using FENNEL
 PREDICTION_MODEL = ""
+
+# File containing nodes that need a shelter and ones that don't. Nodes
+# represented by line number; value of 1 represents a shelter is needed;
+# value of 0 represents shelter is not needed.
+#NEEDS_SHELTER_FILE = os.path.join(pwd, "data", "needs_shelter.txt")
+NEEDS_SHELTER_FILE = ""
 
 # Number of shelters
 num_partitions = args.num_partitions
@@ -61,77 +73,27 @@ use_virtual_nodes = args.use_virtual_nodes
 virtual_node_weight = 1.0
 virtual_edge_weight = 1.0
 
-# Go to cell 3 to shuffle arrivals
-
-
-# In[2]:
-
-import numpy as np
-import networkit
-import networkx as nx
-
-# Reading data
-# - neither networkit nor networkx handle node weights
-# - networkit can read the METIS file format, networkx can't
-# - networkit does not support extra attributes to nodes or
-#    edges, however they can be added later when writing to
-#    a GraphML file format[1]
-# - networkx support node and edge attributes, so we can keep
-#    the partition assignment with the node and also support
-#    virtual nodes without needing to maintain a seperate
-#    data structure.
-# - the most sensible method for loading the graph data is to
-#    read the METIS file with networkit, convert the graph to
-#    a networkx graph, then read the METIS file once again
-#    and load the node weights into a networkx node attribute
-#
-# Writing data
-# - to be able to write the output data with the partition
-#    each node is assigned to, a suitable file format to write
-#    to is needed
-# - writing to a METIS file will lose the partition assignments
-# - if we use networkit to write the data, then the only function
-#    available is GraphMLWriter()
-# - networkx provides a richer set of output methods which
-#    preserve the partition assignment
-# - using networkit to write GML data causes a loss of edge weights and node weights
-# - using networkx to write GML data preserves node and edge weights
-# [1]: https://networkit.iti.kit.edu/data/uploads/docs/NetworKit-Doc/python/html/graphio.html#networkit.graphio.GraphMLWriter
-
 # read METIS file
-print("Loading graph data...")
-nkG = networkit.graphio.METISGraphReader().read(DATA_FILENAME)
+G, edge_weights = shared.read_metis(DATA_FILENAME)
 
-# convert to networkx Graph
-G = networkit.nxadapter.nk2nx(nkG)
+# Order of nodes arriving
+arrival_order = list(range(0, G.number_of_nodes()))
+#random.shuffle(arrival_order)
 
-# add node weights from METIS file
-with open(DATA_FILENAME, "r") as metis:
-    
-    # read meta data from first line
-    first_line = next(metis).split()
-    m_nodes = int(first_line[0])
-    m_edges = int(first_line[1])
+# If set, the node weight is set to 100 if the node requires a shelter, otherwise 0.
+adjust_node_weight_to_needs_shelter = False
 
-    for i, line in enumerate(metis):
-        if line.strip():
-            weight = line.split()[0]
-            G.add_nodes_from([i], weight=str(weight))
-        else:
-            # blank line indicates no node weight
-            G.add_nodes_from([i], weight=0.0)
+# Alpha value used in prediction model
+prediction_model_alpha = G.number_of_edges() * (num_partitions / G.number_of_nodes()**2)
 
-edges = np.array(G.edges(), dtype=np.int32)
-edge_weights = np.array([x[2]['weight'] for x in G.edges(data=True)], dtype=np.float32)
-node_weights = np.array([x[1]['weight'] for x in G.nodes(data=True)], dtype=np.float32)
+if NEEDS_SHELTER_FILE == "":
+    # mark all nodes as needing a shelter
+    needs_shelter = [1]*G.number_of_nodes()
+else:
+    with open(NEEDS_SHELTER_FILE, "r") as f:
+        needs_shelter = [int(line.rstrip('\n')) for line in f]
 
-# sanity check
-assert (m_nodes == G.number_of_nodes())
-assert (m_nodes == len(node_weights))
-assert (m_edges == G.number_of_edges())
-assert (m_edges == len(edge_weights))
-assert (m_edges == len(edges))
-
+print("Graph loaded...")
 print("Nodes: {}".format(G.number_of_nodes()))
 print("Edges: {}".format(G.number_of_edges()))
 if nx.is_directed(G):
@@ -140,35 +102,45 @@ else:
     print("Graph is undirected")
 
 
+# In[2]:
+
+# Set high node weight for those that need a shelter, and reduce for those that don't
+if adjust_node_weight_to_needs_shelter:
+    for i, s in enumerate(needs_shelter):
+        n = i+1
+        if s == 1:
+            G.node[n]['weight'] = 100
+        else:
+            G.node[n]['weight'] = 0
+
+# Update edge weights for nodes that have an assigned probability of displacement
+for edge in G.edges_iter(data=True):
+    left = edge[0]
+    right = edge[1]
+    edge_weight = edge[2]['weight']
+
+    # new edge weight
+    edge[2]['weight'] = (float(G.node[left]['weight']) * edge_weight) * (float(G.node[right]['weight']) * edge_weight)
+
+
 # In[3]:
-
-# Order of people arriving
-arrivals = list(range(0, G.number_of_nodes()))
-#random.shuffle(arrivals)
-
-# Alpha value used in prediction model
-prediction_model_alpha = G.number_of_edges() * (num_partitions / G.number_of_nodes()**2)
-
-
-# In[4]:
 
 get_ipython().magic('load_ext Cython')
 #get_ipython().magic('pylab inline')
 
 
+# In[4]:
+
+get_ipython().run_cell_magic('cython', '', 'import numpy as np\nimport networkx as nx\nfrom shared import bincount_assigned\n\ncdef int UNMAPPED = -1\n\ndef get_votes(graph, int node, float[::] edge_weights, int num_partitions, int[::] partition):\n    seen = set()\n    cdef float[::] partition_votes = np.zeros(num_partitions, dtype=np.float32)\n\n    # find all neighbors from whole graph\n    node_neighbors = list(nx.all_neighbors(graph, node))\n    node_neighbors = [x for x in node_neighbors if x not in seen and not seen.add(x)]\n\n    # calculate votes based on neighbors placed in partitions\n    for n in node_neighbors:\n        if partition[n] != UNMAPPED:\n            partition_votes[partition[n]] += edge_weights[n]\n            \n    return partition_votes\n\ndef get_assignment(graph,\n                   int node,\n                   int num_partitions,\n                   int[::] partition,\n                   float[::] partition_votes,\n                   float alpha,\n                   int debug):\n\n    cdef int arg = 0\n    cdef int max_arg = 0\n    cdef float max_val = 0\n    cdef float val = 0\n    cdef int previous_assignment = 0\n\n    assert partition is not None, "Blank partition passed"\n\n    cdef float[::] partition_sizes = np.zeros(num_partitions, dtype=np.float32)\n    s = bincount_assigned(graph, partition, num_partitions)\n    partition_sizes = np.fromiter(s, dtype=np.float32)\n    \n    if debug:\n        print("Assigning node {}".format(node))\n        print("\\tPn = Votes - Alpha x Size")\n\n    # Remember placement of node in the previous assignment\n    previous_assignment = partition[node]\n\n    max_arg = 0\n    max_val = partition_votes[0] - alpha * partition_sizes[0]\n    if debug:\n        print("\\tP{} = {} - {} x {} = {}".format(0,\n                                                 partition_votes[0],\n                                                 alpha,\n                                                 partition_sizes[0],\n                                                 max_val))\n\n    if previous_assignment == 0:\n        # We remove the node from its current partition before\n        # deciding to re-add it, so subtract alpha to give\n        # result of 1 lower partition size.\n        max_val += alpha\n\n    for arg in range(1, num_partitions):\n        val = partition_votes[arg] - alpha * partition_sizes[arg]\n\n        if debug:\n            print("\\tP{} = {} - {} x {} = {}".format(arg,\n                                                     partition_votes[arg],\n                                                     alpha,\n                                                     partition_sizes[arg],\n                                                     val))\n        if previous_assignment == arg:\n            # See comment above\n            val += alpha\n        if val > max_val:\n            max_arg = arg\n            max_val = val\n\n    if debug:\n        print("\\tassigned to P{}".format(max_arg))\n\n    return max_arg\n\ndef fennel_rework(graph, \n                  float[::] edge_weights,\n                  int num_partitions,\n                  int[::] assignments,\n                  int[::] fixed,\n                  float alpha,\n                  int debug):\n\n    single_nodes = []\n    for n in graph.nodes_iter():\n\n        # Exclude single nodes, deal with these later\n        neighbors = list(nx.all_neighbors(graph, n))\n        if not neighbors:\n            single_nodes.append(n)\n            continue\n            \n        # Skip fixed nodes\n        if fixed[n] != UNMAPPED:\n            if debug:\n                print("Skipping node {}".format(n))\n            continue\n\n        partition_votes = get_votes(graph, n, edge_weights, num_partitions, assignments)\n        assignments[n] = get_assignment(graph, n, num_partitions, assignments, partition_votes, alpha, debug)\n\n    # Assign single nodes\n    for n in single_nodes:\n        if assignments[n] == UNMAPPED:\n            parts = bincount_assigned(graph, assignments, num_partitions)\n            smallest = parts.index(min(parts))\n            assignments[n] = smallest\n\n    return np.asarray(assignments)')
+
+
 # In[5]:
 
-get_ipython().run_cell_magic('cython', '', 'import numpy as np\nimport networkx as nx\nfrom shared import bincount_assigned\n\ncdef int UNMAPPED = -1\n\ndef get_votes(graph, int node, float[::] edge_weights, int num_partitions, int[::] partition):\n    seen = set()\n    cdef float[::] partition_votes = np.zeros(num_partitions, dtype=np.float32)\n\n    # find all neighbors from whole graph\n    node_neighbors = list(nx.all_neighbors(graph, node))\n    node_neighbors = [x for x in node_neighbors if x not in seen and not seen.add(x)]\n\n    # calculate votes based on neighbors placed in partitions\n    for n in node_neighbors:\n        if partition[n] != UNMAPPED:\n            partition_votes[partition[n]] += edge_weights[n]\n            \n    return partition_votes\n\ndef get_assignment(int node,\n                   float[::] node_weights,\n                   int num_partitions,\n                   int[::] partition,\n                   float[::] partition_votes,\n                   float alpha,\n                   int debug):\n\n    cdef int arg = 0\n    cdef int max_arg = 0\n    cdef float max_val = 0\n    cdef float val = 0\n    cdef int previous_assignment = 0\n\n    assert partition is not None, "Blank partition passed"\n\n    cdef float[::] partition_sizes = np.zeros(num_partitions, dtype=np.float32)\n    s = bincount_assigned(partition, num_partitions, weights=node_weights)\n    partition_sizes = np.fromiter(s, dtype=np.float32)\n    \n    if debug:\n        print("Assigning node {}".format(node))\n        print("\\tPn = Votes - Alpha x Size")\n\n    # Remember placement of node in the previous assignment\n    previous_assignment = partition[node]\n\n    max_arg = 0\n    max_val = partition_votes[0] - alpha * partition_sizes[0]\n    if debug:\n        print("\\tP{} = {} - {} x {} = {}".format(0,\n                                                 partition_votes[0],\n                                                 alpha,\n                                                 partition_sizes[0],\n                                                 max_val))\n\n    if previous_assignment == 0:\n        # We remove the node from its current partition before\n        # deciding to re-add it, so subtract alpha to give\n        # result of 1 lower partition size.\n        max_val += alpha\n\n    for arg in range(1, num_partitions):\n        val = partition_votes[arg] - alpha * partition_sizes[arg]\n\n        if debug:\n            print("\\tP{} = {} - {} x {} = {}".format(arg,\n                                                     partition_votes[arg],\n                                                     alpha,\n                                                     partition_sizes[arg],\n                                                     val))\n        if previous_assignment == arg:\n            # See comment above\n            val += alpha\n        if val > max_val:\n            max_arg = arg\n            max_val = val\n\n    if debug:\n        print("\\tassigned to P{}".format(max_arg))\n\n    return max_arg\n\ndef fennel_rework(graph, \n                  float[::] edge_weights,\n                  float[::] node_weights,\n                  int num_partitions,\n                  int[::] assignments,\n                  int[::] fixed,\n                  float alpha,\n                  int debug):\n\n    single_nodes = []\n    for n in range(0, graph.number_of_nodes()):\n\n        # Exclude single nodes, deal with these later\n        neighbors = list(nx.all_neighbors(graph, n))\n        if not neighbors:\n            single_nodes.append(n)\n            continue\n            \n        # Skip fixed nodes\n        if fixed[n] != UNMAPPED:\n            if debug:\n                print("Skipping node {}".format(n))\n            continue\n\n        partition_votes = get_votes(graph, n, edge_weights, num_partitions, assignments)\n        assignments[n] = get_assignment(n, node_weights, num_partitions, assignments, partition_votes, alpha, debug)\n\n    # Assign single nodes\n    for n in single_nodes:\n        if assignments[n] == UNMAPPED:\n            parts = bincount_assigned(assignments, num_partitions)\n            smallest = parts.index(min(parts))\n            assignments[n] = smallest\n\n    return np.asarray(assignments)')
-
-
-# In[6]:
-
-import shared
 UNMAPPED = -1
 
 # reset
-assignments = np.repeat(np.int32(UNMAPPED), len(node_weights))
-fixed = np.repeat(np.int32(UNMAPPED), len(node_weights))
+assignments = np.repeat(np.int32(UNMAPPED), G.number_of_nodes())
+fixed = np.repeat(np.int32(UNMAPPED), G.number_of_nodes())
 
 print("PREDICTION MODEL")
 print("----------------\n")
@@ -177,15 +149,15 @@ print("WASTE\t\tCUT RATIO\tMISMATCH")
 if PREDICTION_MODEL:
     with open(PREDICTION_MODEL, "r") as inf:
         assignments = np.fromiter(inf.readlines(), dtype=np.int32)
-    x = shared.score(assignments, edges)
+    x = shared.score(G, assignments)
     print("{0:.5f}\t\t{1:.10f}\t{2}".format(x[0], x[1], x[2]))
 
 else:
     for i in range(num_iterations):
         alpha = prediction_model_alpha
-        assignments = fennel_rework(G, edge_weights, node_weights, num_partitions, assignments, fixed, alpha, 0)
+        assignments = fennel_rework(G, edge_weights, num_partitions, assignments, fixed, alpha, 0)
 
-        x = shared.score(assignments, edges)
+        x = shared.score(G, assignments)
         print("{0:.5f}\t\t{1:.10f}\t{2}".format(x[0], x[1], x[2]))
 
 print("\nAssignments:")
@@ -194,10 +166,10 @@ shared.fixed_width_print(assignments)
 nodes_fixed = len([o for o in fixed if o == 1])
 print("\nFixed: {}".format(nodes_fixed))
 
-shared.print_partitions(assignments, num_partitions, node_weights)
+shared.print_partitions(G, assignments, num_partitions)
 
 
-# In[7]:
+# In[6]:
 
 if use_virtual_nodes:
     print("Creating virtual nodes and assigning edges based on prediction model")
@@ -219,16 +191,14 @@ if use_virtual_nodes:
     G.add_nodes_from(virtual_nodes, weight=virtual_node_weight)
     G.add_edges_from(virtual_edges, weight=virtual_edge_weight)
 
-    edges = np.array(G.edges(), dtype=np.int32)
     edge_weights = np.array([x[2]['weight'] for x in G.edges(data=True)], dtype=np.float32)
-    node_weights = np.array([x[1]['weight'] for x in G.nodes(data=True)], dtype=np.float32)
 
     print("\nAssignments:")
     shared.fixed_width_print(assignments)
     print("Last {} nodes are virtual nodes.".format(num_partitions))
 
 
-# In[8]:
+# In[7]:
 
 cut_off_value = int(prediction_model_cut_off * G.number_of_nodes())
 if prediction_model_cut_off == 0:
@@ -239,7 +209,11 @@ else:
 # fix arrivals
 nodes_arrived = []
 print("WASTE\t\tCUT RATIO\tMISMATCH")
-for a in arrivals:
+for a in arrival_order:
+    # check if node needs a shelter
+    if needs_shelter[a] == 0:
+        continue
+
     nodes_fixed = len([o for o in fixed if o == 1])
     if nodes_fixed >= cut_off_value:
         break
@@ -249,7 +223,7 @@ for a in arrivals:
     # make a subgraph of all arrived nodes
     Gsub = G.subgraph(nodes_arrived)
 
-    x = shared.score(assignments, Gsub.edges(), num_partitions)
+    x = shared.score(Gsub, assignments, num_partitions)
     print("{0:.5f}\t\t{1:.10f}\t{2}".format(x[0], x[1], x[2]))
 
 # remove nodes not fixed, ie. discard prediction model
@@ -258,7 +232,7 @@ for i in range(0, len(assignments)):
         assignments[i] = -1
 
 print("WASTE\t\tCUT RATIO\tMISMATCH")
-x = shared.score(assignments, edges, num_partitions)
+x = shared.score(G, assignments, num_partitions)
 print("{0:.5f}\t\t{1:.10f}\t{2}".format(x[0], x[1], x[2]))
 
 print("\nAssignments:")
@@ -267,10 +241,10 @@ shared.fixed_width_print(assignments)
 nodes_fixed = len([o for o in fixed if o == 1])
 print("\nFixed: {}".format(nodes_fixed))
 
-shared.print_partitions(assignments, num_partitions, node_weights)
+shared.print_partitions(G, assignments, num_partitions)
 
 
-# In[9]:
+# In[8]:
 
 if restream_batches == 1:
     print("One-shot assignment mode")
@@ -281,7 +255,11 @@ else:
 
 batch_arrived = []
 print("WASTE\t\tCUT RATIO\tMISMATCH\tALPHA")
-for a in arrivals:
+for a in arrival_order:
+    # check if node needs a shelter
+    if needs_shelter[a] == 0:
+        continue
+
     # check if node is already arrived
     if fixed[a] == 1:
         continue
@@ -290,14 +268,14 @@ for a in arrivals:
     if restream_batches == 1:
         alpha = one_shot_alpha
         partition_votes = get_votes(G, a, edge_weights, num_partitions, assignments)
-        assignments[a] = get_assignment(a, node_weights, num_partitions, assignments, partition_votes, alpha, 0)
+        assignments[a] = get_assignment(G, a, num_partitions, assignments, partition_votes, alpha, 0)
         fixed[a] = 1
         nodes_arrived.append(a)
 
         # make a subgraph of all arrived nodes
         Gsub = G.subgraph(nodes_arrived)
 
-        x = shared.score(assignments, Gsub.edges(), num_partitions)
+        x = shared.score(Gsub, assignments, num_partitions)
         print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3:.10f}".format(x[0], x[1], x[2], alpha))
         continue
 
@@ -320,11 +298,11 @@ for a in arrivals:
         # restream
         for n in batch_arrived:
             partition_votes = get_votes(Gsub, n, edge_weights, num_partitions, assignments)
-            assignments[n] = get_assignment(n, node_weights, num_partitions, assignments, partition_votes, alpha, 0)
+            assignments[n] = get_assignment(G, n, num_partitions, assignments, partition_votes, alpha, 0)
             fixed[n] = 1
             nodes_arrived.append(n)
 
-        x = shared.score(assignments, Gsub.edges(), num_partitions)
+        x = shared.score(Gsub, assignments, num_partitions)
         print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3:.10f}".format(x[0], x[1], x[2], alpha))
         batch_arrived = []
 
@@ -339,10 +317,10 @@ shared.fixed_width_print(assignments)
 nodes_fixed = len([o for o in fixed if o == 1])
 print("\nFixed: {}".format(nodes_fixed))
 
-shared.print_partitions(assignments, num_partitions, node_weights)
+shared.print_partitions(G, assignments, num_partitions)
 
 
-# In[10]:
+# In[9]:
 
 if use_virtual_nodes:
     print("Remove virtual nodes")
@@ -360,7 +338,7 @@ if use_virtual_nodes:
     print("Edges: {}".format(G.number_of_edges()))
 
 
-# In[11]:
+# In[10]:
 
 # Add partition attribute to nodes
 for i in range(0, len(assignments)):
@@ -370,7 +348,7 @@ for i in range(0, len(assignments)):
 G = nx.freeze(G)
 
 
-# In[12]:
+# In[11]:
 
 import os
 import datetime
@@ -423,7 +401,7 @@ print("Complete graph with {} nodes".format(G.number_of_nodes()))
 (file_maxperm, file_oslom) = shared.write_graph_files(OUTPUT_DIRECTORY, "{}-all".format(data_filename), G)
 
 # original scoring algorithm
-scoring = shared.score(assignments, G.edges(), num_partitions)
+scoring = shared.score(G, assignments, num_partitions)
 graph_metrics.update({
     "waste": scoring[0],
     "cut_ratio": scoring[1],
@@ -461,7 +439,7 @@ metrics_filename = os.path.join(OUTPUT_DIRECTORY, "metrics.csv")
 shared.write_metrics_csv(metrics_filename, graph_fieldnames, graph_metrics)
 
 
-# In[13]:
+# In[12]:
 
 partition_metrics = {}
 partition_fieldnames = [
