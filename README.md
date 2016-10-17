@@ -7,13 +7,12 @@ Initial setup notes
     # requirements for python3 notebook
     sudo apt-get install python3-dev python3-pip build-essential libzmq3-dev libpng-dev libjpeg8-dev libfreetype6-dev
 
-    # requirements for networkit
-    sudo apt-get install libblas-dev liblapack-dev libatlas-base-dev gfortran python3-tk
-    sudo pip3 install virtualenv
-
     # clone git repo and build
     git clone https://github.com/sbarakat/algorithmshop-graph-partitioning.git
     cd algorithmshop-graph-partitioning/
+
+    # virtualenv setup
+    sudo pip3 install virtualenv
     virtualenv -p python3 env
     source env/bin/activate
     pip3 install -r requirements.txt
