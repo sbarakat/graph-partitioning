@@ -74,7 +74,7 @@ virtual_node_weight = 1.0
 virtual_edge_weight = 1.0
 
 # read METIS file
-G, edge_weights = shared.read_metis(DATA_FILENAME)
+G = shared.read_metis(DATA_FILENAME)
 
 # Order of nodes arriving
 arrival_order = list(range(0, G.number_of_nodes()))
@@ -131,7 +131,7 @@ get_ipython().magic('load_ext Cython')
 
 # In[4]:
 
-get_ipython().run_cell_magic('cython', '', 'import numpy as np\nimport networkx as nx\nfrom shared import bincount_assigned\n\ncdef int UNMAPPED = -1\n\ndef get_votes(graph, int node, float[::] edge_weights, int num_partitions, int[::] partition):\n    seen = set()\n    cdef float[::] partition_votes = np.zeros(num_partitions, dtype=np.float32)\n\n    # find all neighbors from whole graph\n    node_neighbors = list(nx.all_neighbors(graph, node))\n    node_neighbors = [x for x in node_neighbors if x not in seen and not seen.add(x)]\n\n    # calculate votes based on neighbors placed in partitions\n    for n in node_neighbors:\n        if partition[n] != UNMAPPED:\n            partition_votes[partition[n]] += edge_weights[n]\n            \n    return partition_votes\n\ndef get_assignment(graph,\n                   int node,\n                   int num_partitions,\n                   int[::] partition,\n                   float[::] partition_votes,\n                   float alpha,\n                   int debug):\n\n    cdef int arg = 0\n    cdef int max_arg = 0\n    cdef float max_val = 0\n    cdef float val = 0\n    cdef int previous_assignment = 0\n\n    assert partition is not None, "Blank partition passed"\n\n    cdef float[::] partition_sizes = np.zeros(num_partitions, dtype=np.float32)\n    s = bincount_assigned(graph, partition, num_partitions)\n    partition_sizes = np.fromiter(s, dtype=np.float32)\n    \n    if debug:\n        print("Assigning node {}".format(node))\n        print("\\tPn = Votes - Alpha x Size")\n\n    # Remember placement of node in the previous assignment\n    previous_assignment = partition[node]\n\n    max_arg = 0\n    max_val = partition_votes[0] - alpha * partition_sizes[0]\n    if debug:\n        print("\\tP{} = {} - {} x {} = {}".format(0,\n                                                 partition_votes[0],\n                                                 alpha,\n                                                 partition_sizes[0],\n                                                 max_val))\n\n    if previous_assignment == 0:\n        # We remove the node from its current partition before\n        # deciding to re-add it, so subtract alpha to give\n        # result of 1 lower partition size.\n        max_val += alpha\n\n    for arg in range(1, num_partitions):\n        val = partition_votes[arg] - alpha * partition_sizes[arg]\n\n        if debug:\n            print("\\tP{} = {} - {} x {} = {}".format(arg,\n                                                     partition_votes[arg],\n                                                     alpha,\n                                                     partition_sizes[arg],\n                                                     val))\n        if previous_assignment == arg:\n            # See comment above\n            val += alpha\n        if val > max_val:\n            max_arg = arg\n            max_val = val\n\n    if debug:\n        print("\\tassigned to P{}".format(max_arg))\n\n    return max_arg\n\ndef fennel_rework(graph, \n                  float[::] edge_weights,\n                  int num_partitions,\n                  int[::] assignments,\n                  int[::] fixed,\n                  float alpha,\n                  int debug):\n\n    single_nodes = []\n    for n in graph.nodes_iter():\n\n        # Exclude single nodes, deal with these later\n        neighbors = list(nx.all_neighbors(graph, n))\n        if not neighbors:\n            single_nodes.append(n)\n            continue\n            \n        # Skip fixed nodes\n        if fixed[n] != UNMAPPED:\n            if debug:\n                print("Skipping node {}".format(n))\n            continue\n\n        partition_votes = get_votes(graph, n, edge_weights, num_partitions, assignments)\n        assignments[n] = get_assignment(graph, n, num_partitions, assignments, partition_votes, alpha, debug)\n\n    # Assign single nodes\n    for n in single_nodes:\n        if assignments[n] == UNMAPPED:\n            parts = bincount_assigned(graph, assignments, num_partitions)\n            smallest = parts.index(min(parts))\n            assignments[n] = smallest\n\n    return np.asarray(assignments)')
+get_ipython().run_cell_magic('cython', '', 'import numpy as np\nimport networkx as nx\nfrom shared import bincount_assigned\n\ncdef int UNMAPPED = -1\n\ndef get_votes(graph, int node, int num_partitions, int[::] partition):\n    seen = set()\n    cdef float[::] partition_votes = np.zeros(num_partitions, dtype=np.float32)\n\n    # find all neighbors from whole graph\n    node_neighbors = list(nx.all_neighbors(graph, node))\n    node_neighbors = [x for x in node_neighbors if x not in seen and not seen.add(x)]\n\n    # calculate votes based on neighbors placed in partitions\n    for right_node in node_neighbors:\n        if partition[right_node] != UNMAPPED:\n            partition_votes[partition[right_node]] += graph[node][right_node][\'weight\']\n\n    return partition_votes\n\ndef get_assignment(graph,\n                   int node,\n                   int num_partitions,\n                   int[::] partition,\n                   float[::] partition_votes,\n                   float alpha,\n                   int debug):\n\n    cdef int arg = 0\n    cdef int max_arg = 0\n    cdef float max_val = 0\n    cdef float val = 0\n    cdef int previous_assignment = 0\n\n    assert partition is not None, "Blank partition passed"\n\n    cdef float[::] partition_sizes = np.zeros(num_partitions, dtype=np.float32)\n    s = bincount_assigned(graph, partition, num_partitions)\n    partition_sizes = np.fromiter(s, dtype=np.float32)\n    \n    if debug:\n        print("Assigning node {}".format(node))\n        print("\\tPn = Votes - Alpha x Size")\n\n    # Remember placement of node in the previous assignment\n    previous_assignment = partition[node]\n\n    max_arg = 0\n    max_val = partition_votes[0] - alpha * partition_sizes[0]\n    if debug:\n        print("\\tP{} = {} - {} x {} = {}".format(0,\n                                                 partition_votes[0],\n                                                 alpha,\n                                                 partition_sizes[0],\n                                                 max_val))\n\n    if previous_assignment == 0:\n        # We remove the node from its current partition before\n        # deciding to re-add it, so subtract alpha to give\n        # result of 1 lower partition size.\n        max_val += alpha\n\n    for arg in range(1, num_partitions):\n        val = partition_votes[arg] - alpha * partition_sizes[arg]\n\n        if debug:\n            print("\\tP{} = {} - {} x {} = {}".format(arg,\n                                                     partition_votes[arg],\n                                                     alpha,\n                                                     partition_sizes[arg],\n                                                     val))\n        if previous_assignment == arg:\n            # See comment above\n            val += alpha\n        if val > max_val:\n            max_arg = arg\n            max_val = val\n\n    if debug:\n        print("\\tassigned to P{}".format(max_arg))\n\n    return max_arg\n\ndef fennel_rework(graph,\n                  int num_partitions,\n                  int[::] assignments,\n                  int[::] fixed,\n                  float alpha,\n                  int debug):\n\n    single_nodes = []\n    for n in graph.nodes_iter():\n\n        # Exclude single nodes, deal with these later\n        neighbors = list(nx.all_neighbors(graph, n))\n        if not neighbors:\n            single_nodes.append(n)\n            continue\n            \n        # Skip fixed nodes\n        if fixed[n] != UNMAPPED:\n            if debug:\n                print("Skipping node {}".format(n))\n            continue\n\n        partition_votes = get_votes(graph, n, num_partitions, assignments)\n        assignments[n] = get_assignment(graph, n, num_partitions, assignments, partition_votes, alpha, debug)\n\n    # Assign single nodes\n    for n in single_nodes:\n        if assignments[n] == UNMAPPED:\n            parts = bincount_assigned(graph, assignments, num_partitions)\n            smallest = parts.index(min(parts))\n            assignments[n] = smallest\n\n    return np.asarray(assignments)')
 
 
 # In[5]:
@@ -155,7 +155,7 @@ if PREDICTION_MODEL:
 else:
     for i in range(num_iterations):
         alpha = prediction_model_alpha
-        assignments = fennel_rework(G, edge_weights, num_partitions, assignments, fixed, alpha, 0)
+        assignments = fennel_rework(G, num_partitions, assignments, fixed, alpha, 0)
 
         x = shared.score(G, assignments)
         print("{0:.5f}\t\t{1:.10f}\t{2}".format(x[0], x[1], x[2]))
@@ -190,8 +190,6 @@ if use_virtual_nodes:
 
     G.add_nodes_from(virtual_nodes, weight=virtual_node_weight)
     G.add_edges_from(virtual_edges, weight=virtual_edge_weight)
-
-    edge_weights = np.array([x[2]['weight'] for x in G.edges(data=True)], dtype=np.float32)
 
     print("\nAssignments:")
     shared.fixed_width_print(assignments)
@@ -267,7 +265,7 @@ for a in arrival_order:
     # one-shot assigment: assign each node as it arrives
     if restream_batches == 1:
         alpha = one_shot_alpha
-        partition_votes = get_votes(G, a, edge_weights, num_partitions, assignments)
+        partition_votes = get_votes(G, a, num_partitions, assignments)
         assignments[a] = get_assignment(G, a, num_partitions, assignments, partition_votes, alpha, 0)
         fixed[a] = 1
         nodes_arrived.append(a)
@@ -297,7 +295,7 @@ for a in arrival_order:
 
         # restream
         for n in batch_arrived:
-            partition_votes = get_votes(Gsub, n, edge_weights, num_partitions, assignments)
+            partition_votes = get_votes(Gsub, n, num_partitions, assignments)
             assignments[n] = get_assignment(G, n, num_partitions, assignments, partition_votes, alpha, 0)
             fixed[n] = 1
             nodes_arrived.append(n)

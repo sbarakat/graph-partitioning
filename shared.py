@@ -75,14 +75,11 @@ def read_metis(DATA_FILENAME):
                 G.add_nodes_from([n], weight=int(0))
             n += 1
 
-    edge_weights = np.array([x[2]['weight'] for x in G.edges(data=True)], dtype=np.float32)
-
     # sanity check
     assert (m_nodes == G.number_of_nodes())
     assert (m_edges == G.number_of_edges())
-    assert (m_edges == len(edge_weights))
 
-    return (G, edge_weights)
+    return G
 
 
 def bincount_assigned(graph, assignments, num_partitions):
