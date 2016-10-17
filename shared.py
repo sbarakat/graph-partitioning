@@ -13,103 +13,6 @@ import networkx as nx
 
 BIN_DIRECTORY = os.path.join(os.path.dirname(__file__), "bin")
 
-def row_generator(data_path):
-    """This will generate all the edges in the graph."""
-    edges = []
-    with gzip.open(data_path, 'rt') as f:
-        for line in f:
-            if line.startswith('#'):
-                continue
-            else:
-                (left_node, right_node) = line[:-1].split()
-                edges.append((int(left_node), int(right_node)))
-    num_edges = len(edges)
-    # XXX: max() might be a mistake here, use len(set()) instead?
-    num_nodes = max([x[0] for x in edges] + [x[1] for x in edges]) + 1
-    return edges, num_edges, num_nodes
-
-def to_undirected(edge_iterable, num_edges, num_nodes, shuffle=True):
-    """Takes an iterable of edges and produces the list of edges for the undirected graph.
-
-    > to_undirected([[0,1],[1,2],[2,10]], 3, 11)
-    array([[ 0,  1],
-       [ 1,  0],
-       [ 1,  2],
-       [ 2,  1],
-       [ 2, 10],
-       [10,  2]])
-    """
-    # need int64 to do gross bithacks
-    as_array = np.zeros((num_edges, 2), dtype=np.int64)
-    for (i, (n_0, n_1)) in enumerate(edge_iterable):
-            as_array[i,0] = n_0
-            as_array[i,1] = n_1
-    # The graph is directed, but we want to make it undirected,
-    # which means we will duplicate some rows.
-
-    left_nodes = as_array[:,0]
-    right_nodes = as_array[:,1]
-
-    if shuffle:
-        the_shuffle = np.arange(num_nodes)
-        np.random.shuffle(the_shuffle)
-        left_nodes = the_shuffle.take(left_nodes)
-        right_nodes = the_shuffle.take(right_nodes)
-
-
-    # numpy.unique will not unique whole rows, so this little bit-hacking
-    # is a quick way to get unique rows after making a flipped copy of
-    # each edge.
-    max_bits = int(np.ceil(np.log2(num_nodes + 1)))
-
-    encoded_edges_forward = np.left_shift(left_nodes, max_bits) | right_nodes
-
-    # Flip the columns and do it again:
-    encoded_edges_reverse = np.left_shift(right_nodes, max_bits) | left_nodes
-
-    unique_encoded_edges = np.unique(np.hstack((encoded_edges_forward, encoded_edges_reverse)))
-
-    left_node_decoded = np.right_shift(unique_encoded_edges, max_bits)
-
-    # Mask out the high order bits
-    right_node_decoded = (2 ** (max_bits) - 1) & unique_encoded_edges
-
-    undirected_edges = np.vstack((left_node_decoded, right_node_decoded)).T.astype(np.int32)
-
-    # ascontiguousarray so that it's c-contiguous for cython code below
-    return np.ascontiguousarray(undirected_edges)
-
-
-def get_clean_data(data_path, shuffle=True, save_readable=False):
-    data_dir = os.path.dirname(data_path)
-    file_name, _ = os.path.splitext(os.path.basename(data_path))
-
-    if shuffle:
-        name = os.path.join(data_dir, file_name + '-cleaned-shuffled.npy')
-        name_readable = os.path.join(data_dir, file_name + '-cleaned-shuffled.txt')
-    else:
-        name = os.path.join(data_dir, file_name + '-cleaned.npy')
-        name_readable = os.path.join(data_dir, file_name + '-cleaned.txt')
-
-    if False and os.path.exists(name):
-        print('Loading from file {}'.format(name))
-        return np.load(name)
-    else:
-        print('Parsing from zip. Will write to file {}'.format(name), flush=True)
-
-        # Lets get the edges into one big array
-        edges, num_edges, num_nodes = row_generator(data_path)
-        edges = to_undirected(edges, num_edges, num_nodes, shuffle=shuffle)
-        print('ORIGINAL DIST: {} MIN: {} MAX: {}'.format(np.abs(edges[:,0] - edges[:,1]).mean(), edges.min(), edges.max()))
-        np.save(name, edges)
-
-        if save_readable:
-            with open(name_readable, 'w') as r:
-                for e in edges:
-                    r.write("{} {}\n".format(e[0], e[1]))
-
-        return edges, num_edges, num_nodes
-
 def read_metis(DATA_FILENAME):
 
     G = nx.Graph()
@@ -194,6 +97,7 @@ def bincount_assigned(graph, assignments, num_partitions):
             parts[assignments[node]] += weight
 
     return parts
+
 
 def score(graph, assignment, num_partitions=None):
     """Compute the score given an assignment of vertices.
