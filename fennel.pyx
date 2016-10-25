@@ -1,6 +1,7 @@
 import numpy as np
 import networkx as nx
-from shared import bincount_assigned
+from cpython cimport bool
+from shared import bincount_assigned, score
 
 cdef int UNMAPPED = -1
 
@@ -116,3 +117,14 @@ def fennel_rework(graph,
 
     return np.asarray(assignments)
 
+def generate_prediction_model(graph,
+                              int num_iterations,
+                              int num_partitions,
+                              int [::] assignments,
+                              int [::] fixed,
+                              float alpha):
+
+    for i in range(num_iterations):
+        assignments = fennel_rework(graph, num_partitions, assignments, fixed, alpha, 0)
+
+    return np.asarray(assignments)
