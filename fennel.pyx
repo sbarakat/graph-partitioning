@@ -83,12 +83,12 @@ def get_assignment(graph,
 
     return max_arg
 
-def fennel_rework(graph,
-                  int num_partitions,
-                  int[::] assignments,
-                  int[::] fixed,
-                  float alpha,
-                  int debug):
+def fennel(graph,
+           int num_partitions,
+           int[::] assignments,
+           int[::] fixed,
+           float alpha,
+           int debug):
 
     single_nodes = []
     for n in graph.nodes_iter():
@@ -125,6 +125,6 @@ def generate_prediction_model(graph,
                               float alpha):
 
     for i in range(num_iterations):
-        assignments = fennel_rework(graph, num_partitions, assignments, fixed, alpha, 0)
+        assignments = fennel(graph, num_partitions, assignments, fixed, alpha, 0)
 
     return np.asarray(assignments)

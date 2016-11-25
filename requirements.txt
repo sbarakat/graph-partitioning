@@ -4,4 +4,4 @@ ipython[all]
 numpy==1.11.1
 Cython==0.24.1
 matplotlib==1.5.2
-
+rpy2==2.8.3

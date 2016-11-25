@@ -96,6 +96,37 @@ def bincount_assigned(graph, assignments, num_partitions):
     return parts
 
 
+rpy2_loaded = False
+base = None
+utils = None
+mgcv = None
+def gam_predict(population_csv, num_arrived):
+
+    if not rpy2_loaded:
+        from rpy2.robjects import Formula
+        from rpy2.robjects.packages import importr
+        base = importr('base')
+        utils = importr('utils')
+        mgcv = importr('mgcv')
+        filename = os.path.basename(population_csv)
+
+    # Setup
+    base.setwd(os.path.dirname(population_csv))
+    population = utils.read_csv(filename, header=False, nrows=num_arrived)
+    population.colnames = ["shelter","x","y"]
+
+    # GAM
+    formula = Formula('shelter~s(x,y,k=100)')
+    m = mgcv.gam(formula, family="binomial", method="REML", data=population)
+
+    # Predict for everyone
+    newd = utils.read_csv(filename, header=False)
+    newd.colnames = ["shelter","x","y"]
+    result = mgcv.predict_gam(m, newd, type="response", se_fit=False)
+
+    return list(result)
+
+
 def score(graph, assignment, num_partitions=None):
     """Compute the score given an assignment of vertices.
 
