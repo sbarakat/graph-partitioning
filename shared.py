@@ -151,7 +151,7 @@ def score(graph, assignment, num_partitions=None):
     return (waste, cut_ratio, mismatch)
 
 
-def base_metrics(G):
+def base_metrics(G, assignments=None):
     """
     This algorithm calculates the number of edges cut and scores the communication steps. It gets
     passed a networkx graph with a 'partition' attribute defining the partition of the node.
@@ -167,8 +167,12 @@ def base_metrics(G):
         for e in G.edges_iter(n):
             left = e[0]
             right = e[1]
-            left_partition = G.node[left]['partition']
-            right_partition = G.node[right]['partition']
+            if assignments is None:
+                left_partition = G.node[left]['partition']
+                right_partition = G.node[right]['partition']
+            else:
+                left_partition = assignments[left]
+                right_partition = assignments[right]
 
             if left_partition == right_partition:
                 # right node within same partition, skip
