@@ -146,7 +146,10 @@ def score(graph, assignment, num_partitions=None):
     left_edge_assignment = assignment.take([x[0] for x in graph.edges()]) #edges[:,0])
     right_edge_assignment = assignment.take([x[1] for x in graph.edges()]) #edges[:,1])
     mismatch = (left_edge_assignment != right_edge_assignment).sum()
-    cut_ratio = mismatch / len(graph.edges())
+    if graph.number_of_edges() > 0:
+        cut_ratio = mismatch / graph.number_of_edges()
+    else:
+        cut_ratio = 0.0
 
     return (waste, cut_ratio, mismatch)
 
