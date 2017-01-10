@@ -11,6 +11,13 @@ Initial setup notes
     git clone https://github.com/sbarakat/algorithmshop-graph-partitioning.git
     cd algorithmshop-graph-partitioning/
 
+    # not needed on Ubuntu Xenial
+    sudo add-apt-repository ppa:marutter/rdev
+    sudo apt-get update
+
+    # install R 3.2
+    sudo apt-get install r-base r-base-dev
+
     # virtualenv setup
     sudo pip3 install virtualenv
     virtualenv -p python3 env
