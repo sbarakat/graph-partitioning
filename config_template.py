@@ -10,6 +10,10 @@ class Partitioners(Enum):
 
 # set which algorithm is run for the PREDICTION MODEL
 PREDICTION_MODEL_ALGORITHM = Partitioners.FENNEL
+ASSIGNMENT_MODEL_ALGORITHM = Partitioners.FENNEL
+
+# if set to True, we run all the prediction models and store them separately
+RUN_ALL_PREDICTION_MODEL_ALGORITHMS = True
 
 # SCOTCH SETTINGS
 ENABLE_SCOTCH = True # if set to True, SCOTCH parameters get loaded
@@ -77,3 +81,4 @@ if ENABLE_SCOTCH == True:
 if ENABLE_SCOTCH == False or SCOTCH_ENVIRONMENT_VALID == False:
     print("Enabling FENNEL algorithm, SCOTCH environment invalid OR Scotch not enabled.")
     PREDICTION_MODEL_ALGORITHM = Partitioners.FENNEL
+    ASSIGNMENT_MODEL_ALGORITHM = Partitioners.FENNEL
