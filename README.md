@@ -32,7 +32,10 @@ Run the notebook:
 
 Requirements for MaxPerm
 
+    # for Ubuntu 14.04
     sudo apt-get install libigraph0 libigraph0-dev
+    # for Ubuntu 16.04
+    sudo apt-get install libigraph0v5 libigraph0-dev
     cd bin/MaxPerm/
     gcc Main.c MaxPerm.c -I/usr/include/igraph/ -ligraph -lm -o MaxPerm
 
