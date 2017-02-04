@@ -1,10 +1,12 @@
 import os
 import datetime
-import shared
 import networkx as nx
+import numpy as np
+
+import utils
+
 import pyximport; pyximport.install()
 import fennel
-import numpy as np
 
 class GraphPartitioning:
 
@@ -20,7 +22,7 @@ class GraphPartitioning:
     def load_network(self):
 
         # read METIS file
-        self.G = shared.read_metis(self.DATA_FILENAME)
+        self.G = utils.read_metis(self.DATA_FILENAME)
 
         # Alpha value used in prediction model
         self.prediction_model_alpha = self.G.number_of_edges() * (self.num_partitions / self.G.number_of_nodes()**2)
@@ -76,18 +78,18 @@ class GraphPartitioning:
         print("PREDICTION MODEL")
         print("----------------\n")
 
-        x = shared.score(self.G, self.assignments, self.num_partitions)
-        edges_cut, steps = shared.base_metrics(self.G, self.assignments)
+        x = utils.score(self.G, self.assignments, self.num_partitions)
+        edges_cut, steps = utils.base_metrics(self.G, self.assignments)
         print("WASTE\t\tCUT RATIO\tEDGES CUT\tCOMM VOLUME")
         print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}".format(x[0], x[1], edges_cut, steps))
 
         print("\nAssignments:")
-        shared.fixed_width_print(self.assignments)
+        utils.fixed_width_print(self.assignments)
 
         nodes_fixed = len([o for o in self.fixed if o == 1])
         print("\nFixed: {}".format(nodes_fixed))
 
-        shared.print_partitions(self.G, self.assignments, self.num_partitions)
+        utils.print_partitions(self.G, self.assignments, self.num_partitions)
 
         if self.use_virtual_nodes:
             self.init_virtual_nodes()
@@ -113,7 +115,7 @@ class GraphPartitioning:
         self.G.add_edges_from(self.virtual_edges, weight=self.virtual_edge_weight)
 
         print("\nAssignments:")
-        shared.fixed_width_print(self.assignments)
+        utils.fixed_width_print(self.assignments)
         print("Last {} nodes are virtual nodes.".format(self.num_partitions))
 
 
@@ -146,18 +148,18 @@ class GraphPartitioning:
             if self.fixed[i] == -1:
                 self.assignments[i] = -1
 
-        x = shared.score(self.G, self.assignments, self.num_partitions)
-        edges_cut, steps = shared.base_metrics(self.G, self.assignments)
+        x = utils.score(self.G, self.assignments, self.num_partitions)
+        edges_cut, steps = utils.base_metrics(self.G, self.assignments)
         print("WASTE\t\tCUT RATIO\tEDGES CUT\tCOMM VOLUME")
         print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}".format(x[0], x[1], edges_cut, steps))
 
         print("\nAssignments:")
-        shared.fixed_width_print(self.assignments)
+        utils.fixed_width_print(self.assignments)
 
         nodes_fixed = len([o for o in self.fixed if o == 1])
         print("\nFixed: {}".format(nodes_fixed))
 
-        shared.print_partitions(self.G, self.assignments, self.num_partitions)
+        utils.print_partitions(self.G, self.assignments, self.num_partitions)
 
 
     def _edge_expansion(self, G):
@@ -217,8 +219,8 @@ class GraphPartitioning:
                 # make a subgraph of all arrived nodes
                 Gsub = self.G.subgraph(self.nodes_arrived)
 
-                x = shared.score(Gsub, self.assignments, self.num_partitions)
-                edges_cut, steps = shared.base_metrics(Gsub, self.assignments)
+                x = utils.score(Gsub, self.assignments, self.num_partitions)
+                edges_cut, steps = utils.base_metrics(Gsub, self.assignments)
                 print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t{4:.10f}".format(x[0], x[1], edges_cut, steps, alpha))
                 continue
 
@@ -238,7 +240,7 @@ class GraphPartitioning:
                         else:
                             k = self.gam_k_value
 
-                        gam_weights = shared.gam_predict(self.POPULATION_LOCATION_FILE, len(total_arrived), k)
+                        gam_weights = utils.gam_predict(self.POPULATION_LOCATION_FILE, len(total_arrived), k)
 
                         for node in self.G.nodes_iter():
                             if self.alter_arrived_node_weight_to_100 and node in total_arrived:
@@ -295,8 +297,8 @@ class GraphPartitioning:
                         self.nodes_arrived.append(n)
                     batch_arrived = []
 
-                x = shared.score(Gsub, self.assignments, self.num_partitions)
-                edges_cut, steps = shared.base_metrics(Gsub, self.assignments)
+                x = utils.score(Gsub, self.assignments, self.num_partitions)
+                edges_cut, steps = utils.base_metrics(Gsub, self.assignments)
                 print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t{4:.10f}".format(x[0], x[1], edges_cut, steps, alpha))
 
         # remove nodes not fixed
@@ -305,12 +307,12 @@ class GraphPartitioning:
                 self.assignments[i] = -1
 
         print("\nAssignments:")
-        shared.fixed_width_print(self.assignments)
+        utils.fixed_width_print(self.assignments)
 
         nodes_fixed = len([o for o in self.fixed if o == 1])
         print("\nFixed: {}".format(nodes_fixed))
 
-        shared.print_partitions(self.G, self.assignments, self.num_partitions)
+        utils.print_partitions(self.G, self.assignments, self.num_partitions)
 
 
     def get_metrics(self):
@@ -397,32 +399,32 @@ class GraphPartitioning:
         ]
 
         print("Complete graph with {} nodes".format(self.G.number_of_nodes()))
-        (file_maxperm, file_oslom) = shared.write_graph_files(self.OUTPUT_DIRECTORY,
-                                                              "{}-all".format(self.metrics_filename),
-                                                              self.G)
+        (file_maxperm, file_oslom) = utils.write_graph_files(self.OUTPUT_DIRECTORY,
+                                                             "{}-all".format(self.metrics_filename),
+                                                             self.G)
 
         # original scoring algorithm
-        scoring = shared.score(self.G, self.assignments, self.num_partitions)
+        scoring = utils.score(self.G, self.assignments, self.num_partitions)
         graph_metrics.update({
             "waste": scoring[0],
             "cut_ratio": scoring[1],
         })
 
         # edges cut and communication volume
-        edges_cut, steps = shared.base_metrics(self.G)
+        edges_cut, steps = utils.base_metrics(self.G)
         graph_metrics.update({
             "edges_cut": edges_cut,
             "communication_volume": steps,
         })
 
         # MaxPerm
-        max_perm = shared.run_max_perm(file_maxperm)
+        max_perm = utils.run_max_perm(file_maxperm)
         graph_metrics.update({"network_permanence": max_perm})
 
         # Community Quality metrics
-        community_metrics = shared.run_community_metrics(self.OUTPUT_DIRECTORY,
-                                                         "{}-all".format(self.metrics_filename),
-                                                         file_oslom)
+        community_metrics = utils.run_community_metrics(self.OUTPUT_DIRECTORY,
+                                                        "{}-all".format(self.metrics_filename),
+                                                        file_oslom)
         graph_metrics.update(community_metrics)
 
         print("\nConfig")
@@ -437,7 +439,7 @@ class GraphPartitioning:
 
         # write metrics to CSV
         csv_file = os.path.join(self.OUTPUT_DIRECTORY, "metrics.csv")
-        shared.write_metrics_csv(csv_file, graph_fieldnames, graph_metrics)
+        utils.write_metrics_csv(csv_file, graph_fieldnames, graph_metrics)
 
 
     def get_partition_metrics(self):
@@ -471,18 +473,18 @@ class GraphPartitioning:
             print("\nPartition {} with {} nodes".format(p, Gsub.number_of_nodes()))
             print("-----------------------------\n")
 
-            (file_maxperm, file_oslom) = shared.write_graph_files(self.OUTPUT_DIRECTORY,
-                                                                  "{}-p{}".format(self.metrics_filename, p),
-                                                                  Gsub)
+            (file_maxperm, file_oslom) = utils.write_graph_files(self.OUTPUT_DIRECTORY,
+                                                                 "{}-p{}".format(self.metrics_filename, p),
+                                                                 Gsub)
 
             # MaxPerm
-            max_perm = shared.run_max_perm(file_maxperm)
+            max_perm = utils.run_max_perm(file_maxperm)
             partition_metrics.update({"network_permanence": max_perm})
 
             # Community Quality metrics
-            community_metrics = shared.run_community_metrics(self.OUTPUT_DIRECTORY,
-                                                             "{}-p{}".format(self.metrics_filename, p),
-                                                             file_oslom)
+            community_metrics = utils.run_community_metrics(self.OUTPUT_DIRECTORY,
+                                                            "{}-p{}".format(self.metrics_filename, p),
+                                                            file_oslom)
             partition_metrics.update(community_metrics)
 
             print("\nMetrics")
@@ -491,5 +493,5 @@ class GraphPartitioning:
 
             # write metrics to CSV
             csv_file = os.path.join(self.OUTPUT_DIRECTORY, "metrics-partitions.csv")
-            shared.write_metrics_csv(csv_file, partition_fieldnames, partition_metrics)
+            utils.write_metrics_csv(csv_file, partition_fieldnames, partition_metrics)
 

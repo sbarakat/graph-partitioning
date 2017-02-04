@@ -1,7 +1,7 @@
 import numpy as np
 import networkx as nx
 from cpython cimport bool
-from shared import bincount_assigned, score
+from utils import bincount_assigned, score
 
 cdef int UNMAPPED = -1
 
