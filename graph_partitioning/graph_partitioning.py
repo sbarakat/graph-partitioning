@@ -3,10 +3,10 @@ import datetime
 import networkx as nx
 import numpy as np
 
-import utils
+from graph_partitioning import utils
 
 import pyximport; pyximport.install()
-import fennel
+from graph_partitioning import fennel
 
 class GraphPartitioning:
 
