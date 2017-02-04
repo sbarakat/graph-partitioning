@@ -11,7 +11,7 @@ import subprocess
 import numpy as np
 import networkx as nx
 
-BIN_DIRECTORY = os.path.join(os.path.dirname(__file__), "bin")
+BIN_DIRECTORY = os.path.join(os.path.dirname(__file__), "..", "bin")
 
 def read_metis(DATA_FILENAME):
 

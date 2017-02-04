@@ -1,13 +1,14 @@
 import numpy as np
 import networkx as nx
 from cpython cimport bool
-from shared import bincount_assigned, score
+from utils import bincount_assigned, score
 
 cdef int UNMAPPED = -1
 
-def get_votes(graph, int node, int num_partitions, int[::] partition):
+def get_votes(object graph, int node, int num_partitions, int[::] partition):
     seen = set()
     cdef float[::] partition_votes = np.zeros(num_partitions, dtype=np.float32)
+    cdef int right_node = 0
 
     # find all neighbors from whole graph
     node_neighbors = list(nx.all_neighbors(graph, node))
@@ -17,10 +18,11 @@ def get_votes(graph, int node, int num_partitions, int[::] partition):
     for right_node in node_neighbors:
         if partition[right_node] != UNMAPPED:
             partition_votes[partition[right_node]] += graph[node][right_node]['weight']
+            #partition_votes_nodes[partition[right_node]] += 1
 
     return partition_votes
 
-def get_assignment(graph,
+def get_assignment(object graph,
                    int node,
                    int num_partitions,
                    int[::] partition,
@@ -49,6 +51,12 @@ def get_assignment(graph,
 
     max_arg = 0
     max_val = partition_votes[0] - alpha * partition_sizes[0]
+    # XXX Loneliness score
+    #if partition_votes[arg] > 0:
+    #    max_val = 1 / partition_votes[arg]^n
+    #else:
+    #    max_val = 0
+
     if debug:
         print("\tP{} = {} - {} x {} = {}".format(0,
                                                  partition_votes[0],
@@ -64,6 +72,10 @@ def get_assignment(graph,
 
     for arg in range(1, num_partitions):
         val = partition_votes[arg] - alpha * partition_sizes[arg]
+        #if partition_votes[arg] > 0:
+        #    val = 1 / partition_votes[arg]^n
+        #else:
+        #    val = 0
 
         if debug:
             print("\tP{} = {} - {} x {} = {}".format(arg,
@@ -74,7 +86,7 @@ def get_assignment(graph,
         if previous_assignment == arg:
             # See comment above
             val += alpha
-        if val > max_val:
+        if val > max_val: # XXX take account of partition_sizes
             max_arg = arg
             max_val = val
 
@@ -83,48 +95,54 @@ def get_assignment(graph,
 
     return max_arg
 
-def fennel(graph,
+def fennel(object graph,
            int num_partitions,
            int[::] assignments,
            int[::] fixed,
            float alpha,
            int debug):
 
+    cdef int node = 0
+
     single_nodes = []
-    for n in graph.nodes_iter():
+    for node in graph.nodes_iter():
 
         # Exclude single nodes, deal with these later
-        neighbors = list(nx.all_neighbors(graph, n))
+        neighbors = list(nx.all_neighbors(graph, node))
         if not neighbors:
-            single_nodes.append(n)
+            single_nodes.append(node)
             continue
 
         # Skip fixed nodes
-        if fixed[n] != UNMAPPED:
+        if fixed[node] != UNMAPPED:
             if debug:
-                print("Skipping node {}".format(n))
+                print("Skipping node {}".format(node))
             continue
 
-        partition_votes = get_votes(graph, n, num_partitions, assignments)
-        assignments[n] = get_assignment(graph, n, num_partitions, assignments, partition_votes, alpha, debug)
+        partition_votes = get_votes(graph, node, num_partitions, assignments)
+        assignments[node] = get_assignment(graph, node, num_partitions, assignments, partition_votes, alpha, debug)
 
     # Assign single nodes
-    for n in single_nodes:
-        if assignments[n] == UNMAPPED:
+    node = 0
+    for node in single_nodes:
+        if assignments[node] == UNMAPPED:
             parts = bincount_assigned(graph, assignments, num_partitions)
             smallest = parts.index(min(parts))
-            assignments[n] = smallest
+            assignments[node] = smallest
 
     return np.asarray(assignments)
 
-def generate_prediction_model(graph,
+def generate_prediction_model(object graph,
                               int num_iterations,
                               int num_partitions,
                               int [::] assignments,
                               int [::] fixed,
                               float alpha):
 
+    cdef int i = 0
+
     for i in range(num_iterations):
         assignments = fennel(graph, num_partitions, assignments, fixed, alpha, 0)
 
     return np.asarray(assignments)
+
