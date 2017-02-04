@@ -18,6 +18,7 @@ def get_votes(object graph, int node, int num_partitions, int[::] partition):
     for right_node in node_neighbors:
         if partition[right_node] != UNMAPPED:
             partition_votes[partition[right_node]] += graph[node][right_node]['weight']
+            #partition_votes_nodes[partition[right_node]] += 1
 
     return partition_votes
 
@@ -50,6 +51,12 @@ def get_assignment(object graph,
 
     max_arg = 0
     max_val = partition_votes[0] - alpha * partition_sizes[0]
+    # XXX Loneliness score
+    #if partition_votes[arg] > 0:
+    #    max_val = 1 / partition_votes[arg]^n
+    #else:
+    #    max_val = 0
+
     if debug:
         print("\tP{} = {} - {} x {} = {}".format(0,
                                                  partition_votes[0],
@@ -65,6 +72,10 @@ def get_assignment(object graph,
 
     for arg in range(1, num_partitions):
         val = partition_votes[arg] - alpha * partition_sizes[arg]
+        #if partition_votes[arg] > 0:
+        #    val = 1 / partition_votes[arg]^n
+        #else:
+        #    val = 0
 
         if debug:
             print("\tP{} = {} - {} x {} = {}".format(arg,
@@ -75,7 +86,7 @@ def get_assignment(object graph,
         if previous_assignment == arg:
             # See comment above
             val += alpha
-        if val > max_val:
+        if val > max_val: # XXX take account of partition_sizes
             max_arg = arg
             max_val = val
 
