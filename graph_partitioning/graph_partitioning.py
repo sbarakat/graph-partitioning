@@ -6,7 +6,7 @@ import numpy as np
 from graph_partitioning import utils
 
 import pyximport; pyximport.install()
-from graph_partitioning import fennel
+from graph_partitioning import fennel, scotch_partitioner
 
 class GraphPartitioning:
 
@@ -73,7 +73,8 @@ class GraphPartitioning:
 
         else:
             # XXX edge_expansion()
-            self.assignments = fennel.generate_prediction_model(self.G, self.num_iterations, self.num_partitions, self.assignments, self.fixed, self.prediction_model_alpha)
+            #self.assignments = fennel.generate_prediction_model(self.G, self.num_iterations, self.num_partitions, self.assignments, self.fixed, self.prediction_model_alpha)
+            scotch_partitioner.generate_prediction_model(self.G, self.num_iterations, self.num_partitions, self.assignments, self.fixed)
 
         print("PREDICTION MODEL")
         print("----------------\n")
