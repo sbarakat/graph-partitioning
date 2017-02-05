@@ -4,6 +4,7 @@ from cpython cimport bool
 from utils import bincount_assigned, score
 
 cdef int UNMAPPED = -1
+cdef bool DEBUG = False
 
 def get_votes(object graph, int node, int num_partitions, int[::] partition):
     seen = set()
@@ -27,8 +28,7 @@ def get_assignment(object graph,
                    int num_partitions,
                    int[::] partition,
                    float[::] partition_votes,
-                   float alpha,
-                   int debug):
+                   float alpha):
 
     cdef int arg = 0
     cdef int max_arg = 0
@@ -42,7 +42,7 @@ def get_assignment(object graph,
     s = bincount_assigned(graph, partition, num_partitions)
     partition_sizes = np.fromiter(s, dtype=np.float32)
 
-    if debug:
+    if DEBUG:
         print("Assigning node {}".format(node))
         print("\tPn = Votes - Alpha x Size")
 
@@ -57,7 +57,7 @@ def get_assignment(object graph,
     #else:
     #    max_val = 0
 
-    if debug:
+    if DEBUG:
         print("\tP{} = {} - {} x {} = {}".format(0,
                                                  partition_votes[0],
                                                  alpha,
@@ -77,7 +77,7 @@ def get_assignment(object graph,
         #else:
         #    val = 0
 
-        if debug:
+        if DEBUG:
             print("\tP{} = {} - {} x {} = {}".format(arg,
                                                      partition_votes[arg],
                                                      alpha,
@@ -90,7 +90,7 @@ def get_assignment(object graph,
             max_arg = arg
             max_val = val
 
-    if debug:
+    if DEBUG:
         print("\tassigned to P{}".format(max_arg))
 
     return max_arg
@@ -99,8 +99,7 @@ def fennel(object graph,
            int num_partitions,
            int[::] assignments,
            int[::] fixed,
-           float alpha,
-           int debug):
+           float alpha):
 
     cdef int node = 0
 
@@ -115,12 +114,12 @@ def fennel(object graph,
 
         # Skip fixed nodes
         if fixed[node] != UNMAPPED:
-            if debug:
+            if DEBUG:
                 print("Skipping node {}".format(node))
             continue
 
         partition_votes = get_votes(graph, node, num_partitions, assignments)
-        assignments[node] = get_assignment(graph, node, num_partitions, assignments, partition_votes, alpha, debug)
+        assignments[node] = get_assignment(graph, node, num_partitions, assignments, partition_votes, alpha)
 
     # Assign single nodes
     node = 0
@@ -142,7 +141,7 @@ def generate_prediction_model(object graph,
     cdef int i = 0
 
     for i in range(num_iterations):
-        assignments = fennel(graph, num_partitions, assignments, fixed, alpha, 0)
+        assignments = fennel(graph, num_partitions, assignments, fixed, alpha)
 
     return np.asarray(assignments)
 
