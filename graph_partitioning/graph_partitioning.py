@@ -122,13 +122,9 @@ class GraphPartitioning:
         print("PREDICTION MODEL")
         print("----------------\n")
 
-        x = utils.score(self.G, self.assignments, self.num_partitions)
-        edges_cut, steps = utils.base_metrics(self.G, self.assignments)
         print("WASTE\t\tCUT RATIO\tEDGES CUT\tCOMM VOLUME")
-        print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}".format(x[0], x[1], edges_cut, steps))
-
-        print("\nAssignments:")
-        utils.fixed_width_print(self.assignments)
+        self._print_score()
+        self._print_assignments()
 
         nodes_fixed = len([o for o in self.fixed if o == 1])
         print("\nFixed: {}".format(nodes_fixed))
@@ -158,10 +154,22 @@ class GraphPartitioning:
         self.G.add_nodes_from(self.virtual_nodes, weight=1)
         self.G.add_edges_from(self.virtual_edges, weight=self.virtual_edge_weight)
 
-        print("\nAssignments:")
-        utils.fixed_width_print(self.assignments)
+        self._print_assignments()
         print("Last {} nodes are virtual nodes.".format(self.num_partitions))
 
+
+    def _print_assignments(self):
+        print("\nAssignments:")
+        utils.fixed_width_print(self.assignments)
+
+    def _print_score(self, graph=None):
+        if graph == None:
+            graph = self.G
+        x = utils.score(graph, self.assignments, self.num_partitions)
+        edges_cut, steps = utils.base_metrics(graph, self.assignments)
+        print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}".format(x[0], x[1], edges_cut, steps))
+        #print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t{4:.10f}".format(x[0], x[1], edges_cut, steps, alpha))
+        return [x[0], x[1], edges_cut, steps]
 
     def assign_cut_off(self):
 
@@ -192,13 +200,9 @@ class GraphPartitioning:
             if self.fixed[i] == -1:
                 self.assignments[i] = -1
 
-        x = utils.score(self.G, self.assignments, self.num_partitions)
-        edges_cut, steps = utils.base_metrics(self.G, self.assignments)
         print("WASTE\t\tCUT RATIO\tEDGES CUT\tCOMM VOLUME")
-        print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}".format(x[0], x[1], edges_cut, steps))
-
-        print("\nAssignments:")
-        utils.fixed_width_print(self.assignments)
+        self._print_score()
+        self._print_assignments()
 
         nodes_fixed = len([o for o in self.fixed if o == 1])
         print("\nFixed: {}".format(nodes_fixed))
@@ -233,6 +237,7 @@ class GraphPartitioning:
             print("--------------------------------\n")
 
         batch_arrived = []
+        run_metrics = []
         print("WASTE\t\tCUT RATIO\tEDGES CUT\tTOTAL COMM VOLUME\tALPHA")
         for i, a in enumerate(self.arrival_order):
 
@@ -263,9 +268,7 @@ class GraphPartitioning:
                 # make a subgraph of all arrived nodes
                 Gsub = self.G.subgraph(self.nodes_arrived)
 
-                x = utils.score(Gsub, self.assignments, self.num_partitions)
-                edges_cut, steps = utils.base_metrics(Gsub, self.assignments)
-                print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t{4:.10f}".format(x[0], x[1], edges_cut, steps, alpha))
+                self._print_score(Gsub)
                 continue
 
             batch_arrived.append(a)
@@ -342,22 +345,21 @@ class GraphPartitioning:
                         self.nodes_arrived.append(n)
                     batch_arrived = []
 
-                x = utils.score(Gsub, self.assignments, self.num_partitions)
-                edges_cut, steps = utils.base_metrics(Gsub, self.assignments)
-                print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t{4:.10f}".format(x[0], x[1], edges_cut, steps, alpha))
+                run_metrics += [self._print_score(Gsub)]
 
         # remove nodes not fixed
         for i in range(0, len(self.assignments)):
             if self.fixed[i] == -1:
                 self.assignments[i] = -1
 
-        print("\nAssignments:")
-        utils.fixed_width_print(self.assignments)
+        self._print_assignments()
 
         nodes_fixed = len([o for o in self.fixed if o == 1])
         print("\nFixed: {}".format(nodes_fixed))
 
         utils.print_partitions(self.G, self.assignments, self.num_partitions)
+
+        return run_metrics
 
 
     def get_metrics(self):
