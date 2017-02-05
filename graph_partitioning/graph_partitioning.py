@@ -1,12 +1,16 @@
 import os
+import sys
 import datetime
 import networkx as nx
 import numpy as np
+from builtins import ImportError
 
 from graph_partitioning import utils
 
-import pyximport; pyximport.install()
-from graph_partitioning import fennel, scotch_partitioner
+class NoPartitionerException(Exception):
+    """
+    Raised when no partitioner has been specified.
+    """
 
 class GraphPartitioning:
 
@@ -56,6 +60,46 @@ class GraphPartitioning:
             nx.set_edge_attributes(self.G, 'weight_orig', edge_weights)
 
 
+    def init_paritioner(self):
+        self.prediction_model_algorithm = None
+        self.partition_algorithm = None
+
+        if self.PREDICTION_MODEL_ALGORITHM == 'FENNEL' or self.PARTITIONER_ALGORITHM == 'FENNEL':
+
+            import pyximport
+            pyximport.install()
+            from graph_partitioning import fennel
+
+            if self.PREDICTION_MODEL_ALGORITHM == 'FENNEL':
+                self.prediction_model_algorithm = fennel.FennelPartitioner(self.prediction_model_alpha)
+                print("FENNEL partitioner loaded for generating PREDICTION MODEL.")
+
+            if self.PARTITIONER_ALGORITHM == 'FENNEL':
+                self.partition_algorithm = fennel.FennelPartitioner()
+                print("FENNEL partitioner loaded for making shelter assignments.")
+
+
+        if self.PREDICTION_MODEL_ALGORITHM == 'SCOTCH':
+
+            sys.path.insert(0, self.SCOTCH_PYLIB_REL_PATH)
+
+            # check if the library is present
+            if not os.path.isfile(self.SCOTCH_LIB_PATH):
+                raise ImportError("Could not locate the SCOTCH library file at: {}".format(self.SCOTCH_LIB_PATH))
+
+            from graph_partitioning import scotch_partitioner
+
+            self.prediction_model_algorithm = scotch_partitioner.ScotchPartitioner(self.SCOTCH_LIB_PATH)
+
+            print("SCOTCH partitioner loaded for generating PREDICTION MODEL.")
+
+        if self.prediction_model_algorithm == None:
+            raise NoPartitionerException("Prediction model partitioner not specified or incorrect. Available partitioners are 'FENNEL' or 'SCOTCH'.")
+        if self.partition_algorithm == None:
+            raise NoPartitionerException("Assignment partitioner not specified or incorrect. Available partitioners is 'FENNEL'.")
+
+
+
     def reset(self):
 
         self.assignments = np.repeat(np.int32(self.UNMAPPED), self.G.number_of_nodes())
@@ -73,8 +117,7 @@ class GraphPartitioning:
 
         else:
             # XXX edge_expansion()
-            #self.assignments = fennel.generate_prediction_model(self.G, self.num_iterations, self.num_partitions, self.assignments, self.fixed, self.prediction_model_alpha)
-            scotch_partitioner.generate_prediction_model(self.G, self.num_iterations, self.num_partitions, self.assignments, self.fixed)
+            self.assignments = self.prediction_model_algorithm.generate_prediction_model(self.G, self.num_iterations, self.num_partitions, self.assignments, self.fixed)
 
         print("PREDICTION MODEL")
         print("----------------\n")
@@ -260,25 +303,26 @@ class GraphPartitioning:
                     edges_arrived = Gsub.number_of_edges() / 2
                 else:
                     edges_arrived = Gsub.number_of_edges()
-                nodes_fixed = len([o for o in self.fixed if o == 1])
-                alpha = (edges_arrived) * (self.num_partitions / (nodes_fixed + len(batch_arrived))**2)
+
+                if self.PARTITIONER_ALGORITHM == 'FENNEL':
+                    nodes_fixed = len([o for o in self.fixed if o == 1])
+                    alpha = (edges_arrived) * (self.num_partitions / (nodes_fixed + len(batch_arrived))**2)
+                    self.partition_algorithm.PREDICTION_MODEL_ALPHA = alpha
 
                 if self.alter_node_weight_to_gam_prediction:
                     # justification: the gam learns the entire population, so run fennal on entire population
-                    self.assignments = fennel.generate_prediction_model(self.G,
+                    self.assignments = self.partition_algorithm.generate_prediction_model(self.G,
                                                                         self.num_iterations,
                                                                         self.num_partitions,
                                                                         self.assignments,
-                                                                        self.fixed,
-                                                                        alpha)
+                                                                        self.fixed)
                 else:
                     # use the information we have, those that arrived
-                    self.assignments = fennel.generate_prediction_model(Gsub,
+                    self.assignments = self.partition_algorithm.generate_prediction_model(Gsub,
                                                                         self.num_iterations,
                                                                         self.num_partitions,
                                                                         self.assignments,
-                                                                        self.fixed,
-                                                                        alpha)
+                                                                        self.fixed)
 
                 if self.sliding_window:
                     n = batch_arrived.pop(0)
