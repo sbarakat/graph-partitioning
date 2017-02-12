@@ -368,6 +368,9 @@ class GraphPartitioning:
 
 
     def clean_up(self):
+        if nx.is_frozen(self.G):
+            return
+
         if self.use_virtual_nodes:
             print("Remove virtual nodes")
 
@@ -457,7 +460,7 @@ class GraphPartitioning:
         })
 
         # edges cut and communication volume
-        edges_cut, steps, mod = utils.base_metrics(self.G)
+        edges_cut, steps, mod = utils.base_metrics(self.G, self.assignments)
         graph_metrics.update({
             "edges_cut": edges_cut,
             "communication_volume": steps,
@@ -489,8 +492,14 @@ class GraphPartitioning:
 
 
     def get_partition_metrics(self):
-        partition_metrics = {}
-        partition_fieldnames = [
+        partition_nonoverlapping_metrics = {}
+        partition_nonoverlapping_metrics = {}
+        partition_nonoverlapping_fieldnames = [
+            "file",
+            "partition",
+            "modularity"
+        ]
+        partition_overlapping_fieldnames = [
             "file",
             "partition",
             "network_permanence",
@@ -509,7 +518,11 @@ class GraphPartitioning:
         ]
 
         for p in range(0, self.num_partitions):
-            partition_metrics = {
+            partition_overlapping_metrics = {
+                "file": self.metrics_timestamp,
+                "partition": p
+            }
+            partition_nonoverlapping_metrics = {
                 "file": self.metrics_timestamp,
                 "partition": p
             }
@@ -525,19 +538,30 @@ class GraphPartitioning:
 
             # MaxPerm
             max_perm = utils.run_max_perm(file_maxperm)
-            partition_metrics.update({"network_permanence": max_perm})
+            partition_overlapping_metrics.update({"network_permanence": max_perm})
+
+            # Modularity
+            mod = utils.modularity(Gsub)
+            partition_nonoverlapping_metrics.update({"modularity": mod})
 
             # Community Quality metrics
             community_metrics = utils.run_community_metrics(self.OUTPUT_DIRECTORY,
                                                             "{}-p{}".format(self.metrics_filename, p),
                                                             file_oslom)
-            partition_metrics.update(community_metrics)
+            partition_overlapping_metrics.update(community_metrics)
 
             print("\nMetrics")
-            for f in partition_fieldnames:
-                print("{}: {}".format(f, partition_metrics[f]))
+            for f in partition_overlapping_fieldnames:
+                print("{}: {}".format(f, partition_overlapping_metrics[f]))
 
             # write metrics to CSV
-            csv_file = os.path.join(self.OUTPUT_DIRECTORY, "metrics-partitions.csv")
-            utils.write_metrics_csv(csv_file, partition_fieldnames, partition_metrics)
+            csv_file = os.path.join(self.OUTPUT_DIRECTORY, "metrics-partitions-overlapping.csv")
+            utils.write_metrics_csv(csv_file, partition_overlapping_fieldnames, partition_overlapping_metrics)
+
+            for f in partition_nonoverlapping_fieldnames:
+                print("{}: {}".format(f, partition_nonoverlapping_metrics[f]))
+
+            # write metrics to CSV
+            csv_file = os.path.join(self.OUTPUT_DIRECTORY, "metrics-partitions-nonoverlapping.csv")
+            utils.write_metrics_csv(csv_file, partition_nonoverlapping_fieldnames, partition_nonoverlapping_metrics)
 

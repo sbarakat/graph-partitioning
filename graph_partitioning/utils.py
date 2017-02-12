@@ -199,6 +199,11 @@ def base_metrics(G, assignments=None):
 
     return (edges_cut, steps, mod)
 
+def modularity(G):
+    part = dict([(n[0], int(n[1]['partition'])) for n in G.nodes(data=True)])
+    mod = community.modularity(part, G)
+    return mod
+
 
 def run_max_perm(edges_maxperm_filename):
     max_perm = 0.0
