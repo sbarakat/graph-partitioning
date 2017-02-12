@@ -57,25 +57,35 @@ def read_metis(DATA_FILENAME):
             # processing the line.
             if line.strip():
                 e = line.split()
-                if len(e) > 2:
-                    # create weighted edge list:
-                    #  [(1, 2, {'weight':'2'}), (1, 3, {'weight':'8'})]
-                    edges_split = list(zip(*[iter(e[1:])] * 2))
-                    edge_list = [(n, int(v[0]) - 1, {'weight': int(v[1])}) for v in edges_split]
+                if has_edge_weights and has_node_weights:
+                    if len(e) > 2:
+                        # create weighted edge list:
+                        #  [(1, 2, {'weight':'2'}), (1, 3, {'weight':'8'})]
+                        edges_split = list(zip(*[iter(e[1:])] * 2))
+                        edge_list = [(n, int(v[0]) - 1, {'weight': int(v[1])}) for v in edges_split]
 
-                    G.add_edges_from(edge_list)
-                    G.node[n]['weight'] = int(e[0])
+                        G.add_edges_from(edge_list)
+                        G.node[n]['weight'] = int(e[0])
+                    else:
+                        # no edges
+                        G.add_nodes_from([n], weight=int(e[0]))
+
+                elif has_edge_weights and not has_node_weights:
+                    pass
+                elif not has_edge_weights and has_node_weights:
+                    pass
                 else:
-                    # no edges
-                    G.add_nodes_from([n], weight=int(e[0]))
+                    edge_list = [(n, int(v) - 1, {'weight':'1'}) for v in e]
+                    G.add_edges_from(edge_list)
+                    G.node[n]['weight'] = 1
             else:
                 # blank line indicates no node weight
-                G.add_nodes_from([n], weight=int(0))
+                G.add_nodes_from([n], weight=int(1))
             n += 1
 
     # sanity check
-    assert (m_nodes == G.number_of_nodes())
-    assert (m_edges == G.number_of_edges())
+    assert (m_nodes == G.number_of_nodes()), "Expected {} nodes, networkx graph contains {} nodes".format(m_nodes, G.number_of_nodes())
+    assert (m_edges == G.number_of_edges()), "Expected {} edges, networkx graph contains {} edges".format(m_edges, G.number_of_edges())
 
     return G
 
