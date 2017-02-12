@@ -42,8 +42,7 @@ class GraphPartitioning:
                 self.simulated_arrival_list = [int(line.rstrip('\n')) for line in ar]
 
         print("Graph loaded...")
-        print("Nodes: {}".format(self.G.number_of_nodes()))
-        print("Edges: {}".format(self.G.number_of_edges()))
+        print(nx.info(self.G))
         if nx.is_directed(self.G):
             print("Graph is directed")
         else:
@@ -122,8 +121,7 @@ class GraphPartitioning:
         print("PREDICTION MODEL")
         print("----------------\n")
 
-        print("WASTE\t\tCUT RATIO\tEDGES CUT\tCOMM VOLUME")
-        self._print_score()
+        run_metrics = [self._print_score(quiet=True)]
         self._print_assignments()
 
         nodes_fixed = len([o for o in self.fixed if o == 1])
@@ -134,6 +132,7 @@ class GraphPartitioning:
         if self.use_virtual_nodes:
             self.init_virtual_nodes()
 
+        return run_metrics
 
     def init_virtual_nodes(self):
         print("Creating virtual nodes and assigning edges based on prediction model")
@@ -162,14 +161,14 @@ class GraphPartitioning:
         print("\nAssignments:")
         utils.fixed_width_print(self.assignments)
 
-    def _print_score(self, graph=None):
+    def _print_score(self, graph=None, quiet=False):
         if graph == None:
             graph = self.G
         x = utils.score(graph, self.assignments, self.num_partitions)
-        edges_cut, steps = utils.base_metrics(graph, self.assignments)
-        print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}".format(x[0], x[1], edges_cut, steps))
-        #print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t{4:.10f}".format(x[0], x[1], edges_cut, steps, alpha))
-        return [x[0], x[1], edges_cut, steps]
+        edges_cut, steps, mod = utils.base_metrics(graph, self.assignments)
+        if not quiet:
+            print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4}".format(x[0], x[1], edges_cut, steps, mod))
+        return [x[0], x[1], edges_cut, steps, mod]
 
     def assign_cut_off(self):
 
@@ -200,7 +199,7 @@ class GraphPartitioning:
             if self.fixed[i] == -1:
                 self.assignments[i] = -1
 
-        print("WASTE\t\tCUT RATIO\tEDGES CUT\tCOMM VOLUME")
+        print("WASTE\t\tCUT RATIO\tEDGES CUT\tTOTAL COMM VOLUME")
         self._print_score()
         self._print_assignments()
 
@@ -238,7 +237,7 @@ class GraphPartitioning:
 
         batch_arrived = []
         run_metrics = []
-        print("WASTE\t\tCUT RATIO\tEDGES CUT\tTOTAL COMM VOLUME\tALPHA")
+        #print("WASTE\t\tCUT RATIO\tEDGES CUT\tTOTAL COMM VOLUME\tMODULARITY")
         for i, a in enumerate(self.arrival_order):
 
             # check if node is already arrived
@@ -268,7 +267,7 @@ class GraphPartitioning:
                 # make a subgraph of all arrived nodes
                 Gsub = self.G.subgraph(self.nodes_arrived)
 
-                self._print_score(Gsub)
+                self._print_score(Gsub, quiet=True)
                 continue
 
             batch_arrived.append(a)
@@ -345,7 +344,7 @@ class GraphPartitioning:
                         self.nodes_arrived.append(n)
                     batch_arrived = []
 
-                run_metrics += [self._print_score(Gsub)]
+                run_metrics += [self._print_score(Gsub, quiet=True)]
 
         # remove nodes not fixed
         for i in range(0, len(self.assignments)):
@@ -458,7 +457,7 @@ class GraphPartitioning:
         })
 
         # edges cut and communication volume
-        edges_cut, steps = utils.base_metrics(self.G)
+        edges_cut, steps, mod = utils.base_metrics(self.G)
         graph_metrics.update({
             "edges_cut": edges_cut,
             "communication_volume": steps,

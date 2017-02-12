@@ -1,6 +1,3 @@
-
-# Cleaning the data
-
 import os
 import csv
 import gzip
@@ -8,6 +5,7 @@ import shutil
 import tempfile
 import itertools
 import subprocess
+import community
 import numpy as np
 import networkx as nx
 
@@ -194,7 +192,12 @@ def base_metrics(G, assignments=None):
                 steps += 1
                 partition_seen.append(right_partition)
 
-    return (edges_cut, steps)
+    mod = None
+    if not assignments is None:
+        part = dict(zip(G.nodes(), assignments))
+        mod = community.modularity(part, G)
+
+    return (edges_cut, steps, mod)
 
 
 def run_max_perm(edges_maxperm_filename):
@@ -346,3 +349,36 @@ def write_metrics_csv(filename, fields, metrics):
         csv_writer = csv.DictWriter(outf, fieldnames=fields)
         csv_writer.writerow(metrics)
 
+
+def squash_partition(graph, partition_nodes, part, assignments):
+
+    H = graph.copy()
+    H.add_nodes_from(partition_nodes, weight=1)
+
+    del_nodes = []
+    add_edges = []
+    for n in H.edges_iter(data=True):
+        left = n[0]
+        right = n[1]
+        if assignments[left] == part and assignments[right] == part:
+            continue
+
+        elif assignments[left] == part and assignments[right] != part:
+            del_nodes += [right]
+            add_edges += [[left, partition_nodes[assignments[right]]]]
+
+        elif assignments[left] != part and assignments[right] == part:
+            del_nodes += [left]
+            add_edges += [[right, partition_nodes[assignments[left]]]]
+
+        elif assignments[left] != part and assignments[right] != part:
+            del_nodes += [left]
+            del_nodes += [right]
+
+    for d in list(set(del_nodes)):
+        H.remove_node(d)
+    for a in add_edges:
+        H.add_edge(a[0], a[1])
+    H.remove_node(partition_nodes[part])
+
+    return H
