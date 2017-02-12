@@ -321,26 +321,23 @@ def write_to_file(filename, assignments):
             f.write("{} {}\n".format(j,a))
             j += 1
 
-def write_graph_files(output_path, data_filename, G):
+def write_graph_files(output_path, data_filename, G, quiet=False):
 
     if not os.path.exists(output_path):
         os.makedirs(output_path)
 
     # write to GML file
     gml_filename = os.path.join(output_path, data_filename + "-graph.gml")
-    print("Writing GML file: {}".format(gml_filename))
     nx.write_gml(G, gml_filename)
 
     # write assignments into a file with a single column
     assignments_filename = os.path.join(output_path, data_filename + "-assignments.txt")
-    print("Writing assignments: {}".format(assignments_filename))
     with open(assignments_filename, "w") as outf:
         for n in G.nodes_iter(data=True):
             outf.write("{}\n".format(n[1]["partition"]))
 
     # write edge list in a format for MaxPerm, tab delimited
     edges_maxperm_filename = os.path.join(output_path, data_filename + "-edges-maxperm.txt")
-    print("Writing edge list (for MaxPerm): {}".format(edges_maxperm_filename))
     with open(edges_maxperm_filename, "w") as outf:
         outf.write("{}\t{}\n".format(G.number_of_nodes(), G.number_of_edges()))
         for e in G.edges_iter():
@@ -348,11 +345,15 @@ def write_graph_files(output_path, data_filename, G):
 
     # write edge list in a format for OSLOM, tab delimited
     edges_oslom_filename = os.path.join(output_path, data_filename + "-edges-oslom.txt")
-    print("Writing edge list (for OSLOM): {}".format(edges_oslom_filename))
     with open(edges_oslom_filename, "w") as outf:
         for e in G.edges_iter(data=True):
             outf.write("{}\t{}\t{}\n".format(e[0], e[1], e[2]["weight"]))
 
+    if not quiet:
+        print("Writing GML file: {}".format(gml_filename))
+        print("Writing assignments: {}".format(assignments_filename))
+        print("Writing edge list (for MaxPerm): {}".format(edges_maxperm_filename))
+        print("Writing edge list (for OSLOM): {}".format(edges_oslom_filename))
     return (edges_maxperm_filename, edges_oslom_filename)
 
 def write_metrics_csv(filename, fields, metrics):
