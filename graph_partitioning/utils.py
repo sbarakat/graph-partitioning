@@ -75,12 +75,12 @@ def read_metis(DATA_FILENAME):
                 elif not has_edge_weights and has_node_weights:
                     pass
                 else:
-                    edge_list = [(n, int(v) - 1, {'weight':'1'}) for v in e]
+                    edge_list = [(n, int(v) - 1, {'weight':1.0}) for v in e]
                     G.add_edges_from(edge_list)
-                    G.node[n]['weight'] = 1
+                    G.node[n]['weight'] = 1.0
             else:
                 # blank line indicates no node weight
-                G.add_nodes_from([n], weight=int(1))
+                G.add_nodes_from([n], weight=1.0)
             n += 1
 
     # sanity check
