@@ -358,10 +358,12 @@ class GraphPartitioning:
 
                 run_metrics += [self._print_score(Gsub, quiet=True)]
 
-        # remove nodes not fixed
-        for i in range(0, len(self.assignments)):
-            if self.fixed[i] == -1:
-                self.assignments[i] = -1
+            # remove nodes not fixed
+            # TODO: test that this should be indented under the main batch loop
+            # NOTE: this was one level less indented causing each batch to be ignored and not assigned properly.
+            for i in range(0, len(self.assignments)):
+                if self.fixed[i] == -1:
+                    self.assignments[i] = -1
 
         if not self._quiet:
             self._print_assignments()
