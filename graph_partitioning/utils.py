@@ -1,6 +1,3 @@
-
-# Cleaning the data
-
 import os
 import csv
 import gzip
@@ -8,10 +5,11 @@ import shutil
 import tempfile
 import itertools
 import subprocess
+import community
 import numpy as np
 import networkx as nx
 
-BIN_DIRECTORY = os.path.join(os.path.dirname(__file__), "bin")
+BIN_DIRECTORY = os.path.join(os.path.dirname(__file__), "..", "bin")
 
 def read_metis(DATA_FILENAME):
 
@@ -59,25 +57,35 @@ def read_metis(DATA_FILENAME):
             # processing the line.
             if line.strip():
                 e = line.split()
-                if len(e) > 2:
-                    # create weighted edge list:
-                    #  [(1, 2, {'weight':'2'}), (1, 3, {'weight':'8'})]
-                    edges_split = list(zip(*[iter(e[1:])] * 2))
-                    edge_list = [(n, int(v[0]) - 1, {'weight': int(v[1])}) for v in edges_split]
+                if has_edge_weights and has_node_weights:
+                    if len(e) > 2:
+                        # create weighted edge list:
+                        #  [(1, 2, {'weight':'2'}), (1, 3, {'weight':'8'})]
+                        edges_split = list(zip(*[iter(e[1:])] * 2))
+                        edge_list = [(n, int(v[0]) - 1, {'weight': int(v[1])}) for v in edges_split]
 
-                    G.add_edges_from(edge_list)
-                    G.node[n]['weight'] = int(e[0])
+                        G.add_edges_from(edge_list)
+                        G.node[n]['weight'] = int(e[0])
+                    else:
+                        # no edges
+                        G.add_nodes_from([n], weight=int(e[0]))
+
+                elif has_edge_weights and not has_node_weights:
+                    pass
+                elif not has_edge_weights and has_node_weights:
+                    pass
                 else:
-                    # no edges
-                    G.add_nodes_from([n], weight=int(e[0]))
+                    edge_list = [(n, int(v) - 1, {'weight':1.0}) for v in e]
+                    G.add_edges_from(edge_list)
+                    G.node[n]['weight'] = 1.0
             else:
                 # blank line indicates no node weight
-                G.add_nodes_from([n], weight=int(0))
+                G.add_nodes_from([n], weight=1.0)
             n += 1
 
     # sanity check
-    assert (m_nodes == G.number_of_nodes())
-    assert (m_edges == G.number_of_edges())
+    assert (m_nodes == G.number_of_nodes()), "Expected {} nodes, networkx graph contains {} nodes".format(m_nodes, G.number_of_nodes())
+    assert (m_edges == G.number_of_edges()), "Expected {} edges, networkx graph contains {} edges".format(m_edges, G.number_of_edges())
 
     return G
 
@@ -194,7 +202,17 @@ def base_metrics(G, assignments=None):
                 steps += 1
                 partition_seen.append(right_partition)
 
-    return (edges_cut, steps)
+    mod = None
+    if not assignments is None:
+        part = dict(zip(G.nodes(), assignments))
+        mod = community.modularity(part, G)
+
+    return (edges_cut, steps, mod)
+
+def modularity(G):
+    part = dict([(n[0], int(n[1]['partition'])) for n in G.nodes(data=True)])
+    mod = community.modularity(part, G)
+    return mod
 
 
 def run_max_perm(edges_maxperm_filename):
@@ -303,26 +321,23 @@ def write_to_file(filename, assignments):
             f.write("{} {}\n".format(j,a))
             j += 1
 
-def write_graph_files(output_path, data_filename, G):
+def write_graph_files(output_path, data_filename, G, quiet=False):
 
     if not os.path.exists(output_path):
         os.makedirs(output_path)
 
     # write to GML file
     gml_filename = os.path.join(output_path, data_filename + "-graph.gml")
-    print("Writing GML file: {}".format(gml_filename))
     nx.write_gml(G, gml_filename)
 
     # write assignments into a file with a single column
     assignments_filename = os.path.join(output_path, data_filename + "-assignments.txt")
-    print("Writing assignments: {}".format(assignments_filename))
     with open(assignments_filename, "w") as outf:
         for n in G.nodes_iter(data=True):
             outf.write("{}\n".format(n[1]["partition"]))
 
     # write edge list in a format for MaxPerm, tab delimited
     edges_maxperm_filename = os.path.join(output_path, data_filename + "-edges-maxperm.txt")
-    print("Writing edge list (for MaxPerm): {}".format(edges_maxperm_filename))
     with open(edges_maxperm_filename, "w") as outf:
         outf.write("{}\t{}\n".format(G.number_of_nodes(), G.number_of_edges()))
         for e in G.edges_iter():
@@ -330,11 +345,15 @@ def write_graph_files(output_path, data_filename, G):
 
     # write edge list in a format for OSLOM, tab delimited
     edges_oslom_filename = os.path.join(output_path, data_filename + "-edges-oslom.txt")
-    print("Writing edge list (for OSLOM): {}".format(edges_oslom_filename))
     with open(edges_oslom_filename, "w") as outf:
         for e in G.edges_iter(data=True):
             outf.write("{}\t{}\t{}\n".format(e[0], e[1], e[2]["weight"]))
 
+    if not quiet:
+        print("Writing GML file: {}".format(gml_filename))
+        print("Writing assignments: {}".format(assignments_filename))
+        print("Writing edge list (for MaxPerm): {}".format(edges_maxperm_filename))
+        print("Writing edge list (for OSLOM): {}".format(edges_oslom_filename))
     return (edges_maxperm_filename, edges_oslom_filename)
 
 def write_metrics_csv(filename, fields, metrics):
@@ -346,3 +365,36 @@ def write_metrics_csv(filename, fields, metrics):
         csv_writer = csv.DictWriter(outf, fieldnames=fields)
         csv_writer.writerow(metrics)
 
+
+def squash_partition(graph, partition_nodes, part, assignments):
+
+    H = graph.copy()
+    H.add_nodes_from(partition_nodes, weight=1)
+
+    del_nodes = []
+    add_edges = []
+    for n in H.edges_iter(data=True):
+        left = n[0]
+        right = n[1]
+        if assignments[left] == part and assignments[right] == part:
+            continue
+
+        elif assignments[left] == part and assignments[right] != part:
+            del_nodes += [right]
+            add_edges += [[left, partition_nodes[assignments[right]]]]
+
+        elif assignments[left] != part and assignments[right] == part:
+            del_nodes += [left]
+            add_edges += [[right, partition_nodes[assignments[left]]]]
+
+        elif assignments[left] != part and assignments[right] != part:
+            del_nodes += [left]
+            del_nodes += [right]
+
+    for d in list(set(del_nodes)):
+        H.remove_node(d)
+    for a in add_edges:
+        H.add_edge(a[0], a[1])
+    H.remove_node(partition_nodes[part])
+
+    return H
