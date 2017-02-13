@@ -61,7 +61,7 @@ class GraphPartitioning:
             nx.set_edge_attributes(self.G, 'weight_orig', edge_weights)
 
 
-    def init_paritioner(self):
+    def init_partitioner(self):
         self.prediction_model_algorithm = None
         self.partition_algorithm = None
 
@@ -584,4 +584,3 @@ class GraphPartitioning:
 
             csv_file = os.path.join(self.OUTPUT_DIRECTORY, "metrics-partitions-nonoverlapping.csv")
             utils.write_metrics_csv(csv_file, partition_nonoverlapping_fieldnames, partition_nonoverlapping_metrics)
-
