@@ -4,6 +4,14 @@ import sys
 from scotch.graph_mapper import GraphMapper
 from scotch.io import ScotchGraphArrays
 
+'''
+TASK: check neighbors for each node and add virtual edges
+TASK: update node mapping for valid scotch usable graph
+
+Set parttab to assignments (for already fixed nodes already)
+'''
+
+
 class ScotchPartitioner():
 
     def __init__(self, lib_path):
@@ -42,3 +50,14 @@ class ScotchPartitioner():
         else:
             print('Error while setting up SCOTCH for partitioning.')
 
+    def _test_graph_adaptation(self,
+                                graph,
+                                num_iterations,
+                                num_partitions,
+                                assignments,
+                                fixed):
+        '''
+        graph.nodes() -> contains list of active nodes
+        '''
+
+        pass

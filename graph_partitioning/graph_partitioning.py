@@ -286,7 +286,7 @@ class GraphPartitioning:
 
             # batch processing and process remaining nodes on final iteration
             if self.restream_batches == len(batch_arrived) or i == len(self.arrival_order) - 1:
-
+                print('batch arrived')
                 # GRAPH MODIFICATION FUNCTIONS
                 if self.graph_modification_functions:
 
@@ -323,6 +323,7 @@ class GraphPartitioning:
                     alpha = (edges_arrived) * (self.num_partitions / (nodes_fixed + len(batch_arrived))**2)
                     self.partition_algorithm.PREDICTION_MODEL_ALPHA = alpha
 
+                print('assignments before',self.assignments)
                 if self.alter_node_weight_to_gam_prediction:
                     # justification: the gam learns the entire population, so run fennal on entire population
                     self.assignments = self.partition_algorithm.generate_prediction_model(self.G,
@@ -330,6 +331,7 @@ class GraphPartitioning:
                                                                         self.num_partitions,
                                                                         self.assignments,
                                                                         self.fixed)
+                    print('assignments after',self.assignments)
                 else:
                     # use the information we have, those that arrived
                     self.assignments = self.partition_algorithm.generate_prediction_model(Gsub,
