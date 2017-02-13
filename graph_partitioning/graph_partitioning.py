@@ -93,9 +93,13 @@ class GraphPartitioning:
             from graph_partitioning import scotch_partitioner
 
             self.prediction_model_algorithm = scotch_partitioner.ScotchPartitioner(self.SCOTCH_LIB_PATH)
-
             if not self._quiet:
                 print("SCOTCH partitioner loaded for generating PREDICTION MODEL.")
+
+            if self.PARTITIONER_ALGORITHM == 'SCOTCH':
+                self.partition_algorithm = self.prediction_model_algorithm
+                if not self._quiet:
+                    print("SCOTCH partitioner loaded for making shelter assignments.")
 
         if self.prediction_model_algorithm == None:
             raise NoPartitionerException("Prediction model partitioner not specified or incorrect. Available partitioners are 'FENNEL' or 'SCOTCH'.")
@@ -222,7 +226,7 @@ class GraphPartitioning:
 
     def _edge_expansion(self, G):
         # Update edge weights for nodes that have an assigned probability of displacement
-        for edge in self.G.edges_iter(data=True):
+        e
             left = edge[0]
             right = edge[1]
             edge_weight = edge[2]['weight_orig']
@@ -286,7 +290,6 @@ class GraphPartitioning:
 
             # batch processing and process remaining nodes on final iteration
             if self.restream_batches == len(batch_arrived) or i == len(self.arrival_order) - 1:
-                print('batch arrived')
                 # GRAPH MODIFICATION FUNCTIONS
                 if self.graph_modification_functions:
 
@@ -323,7 +326,6 @@ class GraphPartitioning:
                     alpha = (edges_arrived) * (self.num_partitions / (nodes_fixed + len(batch_arrived))**2)
                     self.partition_algorithm.PREDICTION_MODEL_ALPHA = alpha
 
-                print('assignments before',self.assignments)
                 if self.alter_node_weight_to_gam_prediction:
                     # justification: the gam learns the entire population, so run fennal on entire population
                     self.assignments = self.partition_algorithm.generate_prediction_model(self.G,
@@ -331,7 +333,6 @@ class GraphPartitioning:
                                                                         self.num_partitions,
                                                                         self.assignments,
                                                                         self.fixed)
-                    print('assignments after',self.assignments)
                 else:
                     # use the information we have, those that arrived
                     self.assignments = self.partition_algorithm.generate_prediction_model(Gsub,
