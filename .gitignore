@@ -6,3 +6,5 @@ bin/MaxPerm/
 output/
 *.swp
 *.class
+
+config.py
