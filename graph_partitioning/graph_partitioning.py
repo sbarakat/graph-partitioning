@@ -92,11 +92,12 @@ class GraphPartitioning:
 
             from graph_partitioning import scotch_partitioner
 
-            self.prediction_model_algorithm = scotch_partitioner.ScotchPartitioner(self.SCOTCH_LIB_PATH)
+            self.prediction_model_algorithm = scotch_partitioner.ScotchPartitioner(self.SCOTCH_LIB_PATH, virtualNodesEnabled=self.use_virtual_nodes)
             if not self._quiet:
                 print("SCOTCH partitioner loaded for generating PREDICTION MODEL.")
 
             if self.PARTITIONER_ALGORITHM == 'SCOTCH':
+                # use the same prediction_model_algorithm for both batch and prediction modes
                 self.partition_algorithm = self.prediction_model_algorithm
                 if not self._quiet:
                     print("SCOTCH partitioner loaded for making shelter assignments.")

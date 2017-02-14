@@ -19,8 +19,9 @@ Set parttab to assignments (for already fixed nodes already)
 
 class ScotchPartitioner():
 
-    def __init__(self, lib_path):
+    def __init__(self, lib_path, virtualNodesEnabled = False):
         self.SCOTCH_LIB_PATH = lib_path
+        self.virtualNodesEnabled = virtualNodesEnabled
 
     def _generate_prediction_model(self,
                                   graph,
@@ -28,6 +29,7 @@ class ScotchPartitioner():
                                   num_partitions,
                                   assignments,
                                   fixed):
+        # Simple version not using graph map fixed.
 
         # SCOTCH algorithm
         # we have networkx graph already, G
@@ -183,8 +185,10 @@ class ScotchPartitioner():
         return indeces
 
     def _requiresVirtualNodes(self, graph):
-        #return False
-        # TODO this NEEDS the list of nodes that are NOT arrived at a zone
+        if (self.virtualNodesEnabled == False):
+            # we don't allow virtual nodes
+            return False
+
         for node in graph.nodes():
             if len(graph.neighbors(node)) == 0:
                 #print(node, 'has no neighbors')
