@@ -226,7 +226,7 @@ class GraphPartitioning:
 
     def _edge_expansion(self, G):
         # Update edge weights for nodes that have an assigned probability of displacement
-        e
+        for edge in self.G.edges_iter(data=True):
             left = edge[0]
             right = edge[1]
             edge_weight = edge[2]['weight_orig']

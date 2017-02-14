@@ -79,7 +79,6 @@ class ScotchPartitioner():
 
 
         # if there are edgeless nodes, then we need virtual nodes
-        # TODO - currently this just returns False
         requires_virtual = self._requiresVirtualNodes(graph)
         virtual_nodes = []
         if requires_virtual:
@@ -100,9 +99,13 @@ class ScotchPartitioner():
                     pass
 
         # add all the virtual edges
+        virtual_edges = {}
         if requires_virtual:
             virtual_edges = self._virtualEdges(graph, assignments, num_partitions, virtual_nodes)
-            #print('virtual_edges', virtual_edges)
+            for key in list(virtual_edges.keys()):
+                newID = node_indeces[key]
+                G.add_edge(newID, virtual_edges[key])
+                #print('virtual_edge', newID, virtual_edges[key])
 
         # determine the assignment partitions
         scotch_assignments = []
@@ -112,19 +115,24 @@ class ScotchPartitioner():
                 # add node's fixed partition, if present
                 scotch_assignments.append(assignment)
 
+            '''
+            if nodeID in list(virtual_edges.keys()):
+                # fix this node
+                scotch_assignments[node_indeces[nodeID]] = virtual_nodes.index(virtual_edges[nodeID])
+                print('fixing', nodeID, node_indeces[nodeID], virtual_nodes.index(virtual_edges[nodeID]))
+            '''
+
         # add virtual nodes to assignments
         if requires_virtual:
             for i in range(0, num_partitions):
                 scotch_assignments.append(i)
-
-        # TODO node weights
-        # TODO edge weights
 
         # SCOTCH algorithm
         # we have networkx graph already, G
         scotchArrays = ScotchGraphArrays()
         scotchArrays.fromNetworkxGraph(G, parttab=scotch_assignments, baseval=0)
 
+        #print('parttab', scotchArrays._parttab)
         #scotchArrays.debugPrint()
 
         # create instance of SCOTCH
@@ -148,11 +156,15 @@ class ScotchPartitioner():
                         G.remove_node(virtualN)
 
                 # update assignments
+                for oldNode, newNode in enumerate(node_indeces):
+                    assignments[oldNode] = scotch_assignments[newNode]
+                '''
                 for node in G.nodes():
-                    originalNode = graph.nodes()[node]
+                    originalNode = node_indeces.index(node)
+                    #originalNode = graph.nodes()[node]
                     assignments[originalNode] = scotch_assignments[node]
                     #print('setting', node, originalNode, scotch_assignments[node])
-
+                '''
                 return assignments
             else:
                 print('Error while running graphMap()')
@@ -192,7 +204,7 @@ class ScotchPartitioner():
         tmp, partitions = algutils.minPartitionCounts(assignments, num_partitions)
         for node in graph.nodes():
             if len(graph.neighbors(node)) == 0:
-                print(node, ' has no neighbors')
+                #print(node, ' has no neighbors')
                 # this node has no neighbors, choose a node in a partition
                 #partition, partitions = algutils.minPartitionCounts(assignments, num_partitions)
 
@@ -215,16 +227,3 @@ class ScotchPartitioner():
                 #graph.add_edge(virtualNode, node)
                 virtual_edges[node] = virtualNode
         return virtual_edges
-
-
-    def _test_graph_adaptation(self,
-                                graph,
-                                num_iterations,
-                                num_partitions,
-                                assignments,
-                                fixed):
-        '''
-        graph.nodes() -> contains list of active nodes
-        '''
-
-        pass
