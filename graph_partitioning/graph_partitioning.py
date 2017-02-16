@@ -556,7 +556,8 @@ class GraphPartitioning:
             (file_maxperm, file_oslom) = utils.write_graph_files(self.OUTPUT_DIRECTORY,
                                                                  "{}-p{}".format(self.metrics_filename, p),
                                                                  Gsub,
-                                                                 quiet=True)
+                                                                 quiet=True,
+                                                                 relabel_nodes=True)
 
             # MaxPerm
             max_perm = utils.run_max_perm(file_maxperm)
@@ -586,3 +587,4 @@ class GraphPartitioning:
 
             csv_file = os.path.join(self.OUTPUT_DIRECTORY, "metrics-partitions-nonoverlapping.csv")
             utils.write_metrics_csv(csv_file, partition_nonoverlapping_fieldnames, partition_nonoverlapping_metrics)
+
