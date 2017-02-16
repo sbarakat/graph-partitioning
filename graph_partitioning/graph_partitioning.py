@@ -448,7 +448,7 @@ class GraphPartitioning:
             "edges_cut",
             "waste",
             "cut_ratio",
-            "communication_volume",
+            "total_communication_volume",
             "network_permanence",
             "Q",
             "NQ",
@@ -482,7 +482,7 @@ class GraphPartitioning:
         edges_cut, steps, mod = utils.base_metrics(self.G, self.assignments)
         graph_metrics.update({
             "edges_cut": edges_cut,
-            "communication_volume": steps,
+            "total_communication_volume": steps,
         })
 
         # MaxPerm
@@ -517,12 +517,12 @@ class GraphPartitioning:
         partition_nonoverlapping_fieldnames = [
             "file",
             "partition",
-            "modularity"
+            "modularity",
+            "network_permanence",
         ]
         partition_overlapping_fieldnames = [
             "file",
             "partition",
-            "network_permanence",
             "Q",
             "NQ",
             "Qds",
@@ -560,7 +560,7 @@ class GraphPartitioning:
 
             # MaxPerm
             max_perm = utils.run_max_perm(file_maxperm)
-            partition_overlapping_metrics.update({"network_permanence": max_perm})
+            partition_nonoverlapping_metrics.update({"network_permanence": max_perm})
 
             # Modularity
             mod = utils.modularity(Gsub)
