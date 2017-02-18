@@ -273,24 +273,30 @@ def run_community_metrics(output_path, data_filename, edges_oslom_filename):
 
     return metrics
 
-def print_partitions(graph, assignments, num_partitions):
-
+def get_partition_population(graph, assignments, num_partitions):
+    population = {}
     if -1 not in assignments:
-        print("\nPartitions - nodes (weight):")
-        partition_size_nodes = np.bincount(assignments, minlength=num_partitions).astype(np.float32)
-        partition_size_weights = bincount_assigned(graph, assignments, num_partitions)
-        for p in range(0, num_partitions):
-            print("P{}: {} ({})".format(p, partition_size_nodes[p], partition_size_weights[p]))
+        nodes = np.bincount(assignments, minlength=num_partitions).astype(np.float32)
+        weights = bincount_assigned(graph, assignments, num_partitions)
 
     else:
-        print("\nPartitions - nodes:")
-        parts = [0] * num_partitions
+        nodes = [0] * num_partitions
+        weights = [0] * num_partitions
         for i in range(0, len(assignments)):
             if assignments[i] >= 0:
-                parts[assignments[i]] += 1
-        for p in range(0, len(parts)):
-            print("P{}: {}".format(p, parts[p]))
+                nodes[assignments[i]] += 1
 
+    for p in range(0, num_partitions):
+        population[p] = (nodes[p], weights[p])
+
+    return population
+
+def print_partitions(graph, assignments, num_partitions):
+    population = get_partition_population(graph, assignments, num_partitions)
+
+    print("\nPartitions - nodes (weight):")
+    for p in population:
+        print("P{}: {} ({})".format(p, population[p][0], population[p][1]))
 
 def fixed_width_print(arr):
     print("[", end='')

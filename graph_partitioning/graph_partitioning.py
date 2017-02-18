@@ -515,12 +515,14 @@ class GraphPartitioning:
         partition_nonoverlapping_fieldnames = [
             "file",
             "partition",
+            "population",
             "modularity",
             "network_permanence",
         ]
         partition_overlapping_fieldnames = [
             "file",
             "partition",
+            "population",
             "Q",
             "NQ",
             "Qds",
@@ -535,14 +537,18 @@ class GraphPartitioning:
             "QovL",
         ]
 
+        partition_population = utils.get_partition_population(self.G, self.assignments, self.num_partitions)
+
         for p in range(0, self.num_partitions):
             partition_overlapping_metrics = {
                 "file": self.metrics_timestamp,
-                "partition": p
+                "partition": p,
+                "population": partition_population[p][0]
             }
             partition_nonoverlapping_metrics = {
                 "file": self.metrics_timestamp,
-                "partition": p
+                "partition": p,
+                "population": partition_population[p][0]
             }
 
             nodes = [i for i,x in enumerate(self.assignments) if x == p]
