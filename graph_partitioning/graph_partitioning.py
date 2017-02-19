@@ -362,12 +362,10 @@ class GraphPartitioning:
 
                 run_metrics += [self._print_score(Gsub, quiet=True)]
 
-            # remove nodes not fixed
-            # TODO: test that this should be indented under the main batch loop
-            # NOTE: this was one level less indented causing each batch to be ignored and not assigned properly.
-            for i in range(0, len(self.assignments)):
-                if self.fixed[i] == -1:
-                    self.assignments[i] = -1
+        # remove nodes not fixed
+        for i in range(0, len(self.assignments)):
+            if self.fixed[i] == -1:
+                self.assignments[i] = -1
 
         if not self._quiet:
             self._print_assignments()
@@ -452,7 +450,7 @@ class GraphPartitioning:
             "edges_cut",
             "waste",
             "cut_ratio",
-            "communication_volume",
+            "total_communication_volume",
             "network_permanence",
             "Q",
             "NQ",
@@ -486,7 +484,7 @@ class GraphPartitioning:
         edges_cut, steps, mod = utils.base_metrics(self.G, self.assignments)
         graph_metrics.update({
             "edges_cut": edges_cut,
-            "communication_volume": steps,
+            "total_communication_volume": steps,
         })
 
         # MaxPerm
@@ -521,12 +519,14 @@ class GraphPartitioning:
         partition_nonoverlapping_fieldnames = [
             "file",
             "partition",
-            "modularity"
+            "population",
+            "modularity",
+            "network_permanence",
         ]
         partition_overlapping_fieldnames = [
             "file",
             "partition",
-            "network_permanence",
+            "population",
             "Q",
             "NQ",
             "Qds",
@@ -541,14 +541,18 @@ class GraphPartitioning:
             "QovL",
         ]
 
+        partition_population = utils.get_partition_population(self.G, self.assignments, self.num_partitions)
+
         for p in range(0, self.num_partitions):
             partition_overlapping_metrics = {
                 "file": self.metrics_timestamp,
-                "partition": p
+                "partition": p,
+                "population": partition_population[p][0]
             }
             partition_nonoverlapping_metrics = {
                 "file": self.metrics_timestamp,
-                "partition": p
+                "partition": p,
+                "population": partition_population[p][0]
             }
 
             nodes = [i for i,x in enumerate(self.assignments) if x == p]
@@ -560,11 +564,12 @@ class GraphPartitioning:
             (file_maxperm, file_oslom) = utils.write_graph_files(self.OUTPUT_DIRECTORY,
                                                                  "{}-p{}".format(self.metrics_filename, p),
                                                                  Gsub,
-                                                                 quiet=True)
+                                                                 quiet=True,
+                                                                 relabel_nodes=True)
 
             # MaxPerm
             max_perm = utils.run_max_perm(file_maxperm)
-            partition_overlapping_metrics.update({"network_permanence": max_perm})
+            partition_nonoverlapping_metrics.update({"network_permanence": max_perm})
 
             # Modularity
             mod = utils.modularity(Gsub)
@@ -590,3 +595,4 @@ class GraphPartitioning:
 
             csv_file = os.path.join(self.OUTPUT_DIRECTORY, "metrics-partitions-nonoverlapping.csv")
             utils.write_metrics_csv(csv_file, partition_nonoverlapping_fieldnames, partition_nonoverlapping_metrics)
+

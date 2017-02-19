@@ -57,6 +57,13 @@ The last section of the Jupyter Notebook produces metrics to check the quality o
     javac OverlappingCommunityQuality.java
     javac CommunityQuality.java
 
+#### MaxPerm
+
+[MaxPerm](http://cse.iitkgp.ac.in/resgrp/cnerg/permanence/) is a community detection algorithm. The code has not been included in this repository and should be retrieved from the website. Use the following commands to get it to compile on Ubuntu.
+
+    sudo apt-get install libigraph0-dev
+    gcc Main.c MaxPerm.c -I/usr/include/igraph  -L/usr/local/lib -ligraph -lm -o MaxPerm
+
 ## Run the notebook
 
     cd graph-partitioning/
@@ -69,6 +76,7 @@ Further information and the source code used in this repository can be found bel
 
 * Original notebook adapted from Justin Vincent's research on [Graph Partitioning](http://algorithmshop.com/20131213-graph-partitioning.html). Released as public domain and available on [GitHub](https://github.com/justinvf/algorithmshop/blob/master/20131213-graph-partitioning/20131213-graph-partitioning.ipynb).
 * [Fennel: Streaming Graph Partitioning for Massive Scale Graphs](https://www.microsoft.com/en-us/research/publication/fennel-streaming-graph-partitioning-for-massive-scale-graphs/). A Microsoft Technical Report by Charalampos E. Tsourakakis, Christos Gkantsidis, Bozidar Radunovic, Milan Vojnovic.
+* [GenPerm: A Unified Method for Detecting Non-overlapping and Overlapping Communities](https://arxiv.org/abs/1604.03454) by [Tanmoy Chakraborty](https://sites.google.com/site/tanmoychakra88/), Suhansanu Kumar, Niloy Ganguly, Animesh Mukherjee, Sanjukta Bhowmick. This repository makes use of the [Max Permanence](http://cse.iitkgp.ac.in/resgrp/cnerg/permanence/) code for community detection.
 * [OSLOM](http://www.oslom.org/)
 * [ComQualityMetric](https://github.com/chenmingming/ComQualityMetric) by Mingming Chen.
 
