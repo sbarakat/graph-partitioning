@@ -84,7 +84,7 @@ class GraphPartitioning:
 
         if self.PREDICTION_MODEL_ALGORITHM == 'SCOTCH':
 
-            sys.path.insert(0, self.SCOTCH_PYLIB_REL_PATH)
+            #sys.path.insert(0, self.SCOTCH_PYLIB_REL_PATH)
 
             # check if the library is present
             if not os.path.isfile(self.SCOTCH_LIB_PATH):

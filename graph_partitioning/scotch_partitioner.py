@@ -4,10 +4,14 @@ import sys
 import numpy as np
 import networkx as nx
 
-from scotch.graph_mapper import GraphMapper
-from scotch.io import ScotchGraphArrays
+#from scotch.graph_mapper import GraphMapper
+#from scotch.io import ScotchGraphArrays
 
-import utilities.alg_utils as algutils
+import graph_partitioning.partitioners.utils as putils
+import graph_partitioning.partitioners.scotch.scotch as scotch
+import graph_partitioning.partitioners.scotch.scotch_data as sdata
+
+#import utilities.alg_utils as putils
 
 '''
 TASK: check neighbors for each node and add virtual edges
@@ -33,13 +37,15 @@ class ScotchPartitioner():
 
         # SCOTCH algorithm
         # we have networkx graph already, G
-        scotchArrays = ScotchGraphArrays()
+        scotchArrays = sdata.ScotchData()
+        #scotchArrays = ScotchGraphArrays()
         scotchArrays.fromNetworkxGraph(graph, baseval=0)
 
         #scotchArrays.debugPrint()
 
         # create instance of SCOTCH
-        mapper = GraphMapper(self.SCOTCH_LIB_PATH)
+        mapper = scotch.Scotch(self.SCOTCH_LIB_PATH)
+        #mapper = GraphMapper(self.SCOTCH_LIB_PATH)
 
         # set mapper parameters
         mapper.kbalval = 0.1
@@ -131,14 +137,16 @@ class ScotchPartitioner():
 
         # SCOTCH algorithm
         # we have networkx graph already, G
-        scotchArrays = ScotchGraphArrays()
+        scotchArrays = sdata.ScotchData()
+        #scotchArrays = ScotchGraphArrays()
         scotchArrays.fromNetworkxGraph(G, parttab=scotch_assignments, baseval=0)
 
         #print('parttab', scotchArrays._parttab)
         #scotchArrays.debugPrint()
 
         # create instance of SCOTCH
-        mapper = GraphMapper(self.SCOTCH_LIB_PATH)
+        mapper = scotch.Scotch(self.SCOTCH_LIB_PATH)
+        #mapper = GraphMapper(self.SCOTCH_LIB_PATH)
 
         # set mapper parameters
         mapper.kbalval = 0.1
@@ -205,12 +213,12 @@ class ScotchPartitioner():
 
     def _virtualEdges(self, graph, assignments, num_partitions, virtual_nodes):
         virtual_edges = {}
-        tmp, partitions = algutils.minPartitionCounts(assignments, num_partitions)
+        tmp, partitions = putils.minPartitionCounts(assignments, num_partitions)
         for node in graph.nodes():
             if len(graph.neighbors(node)) == 0:
                 #print(node, ' has no neighbors')
                 # this node has no neighbors, choose a node in a partition
-                #partition, partitions = algutils.minPartitionCounts(assignments, num_partitions)
+                #partition, partitions = putils.minPartitionCounts(assignments, num_partitions)
 
                 #print('partitions', partitions)
                 minPart = 1000000

@@ -5,6 +5,46 @@ from pathlib import Path
 
 import numpy as np
 
+def minPartitionCounts(assignments, num_partitions):
+    #print(assignments)
+    partitions = {}
+    for i in range(num_partitions):
+        partitions[i] = 0
+
+    for partition in assignments:
+        if partition < 0:
+            continue
+        if partition in partitions:
+            partitions[partition] += 1
+        else:
+            partitions[partition] = 1
+
+    minCount = len(assignments) + 1
+    minCountPartition = -1
+    for key in list(partitions.keys()):
+        if partitions[key] < minCount:
+            minCount = partitions[key]
+            minCountPartition = key
+
+    if minCountPartition < 0:
+        minCountPartition = pickRandPartition(num_partitions)
+
+    return (minCountPartition, partitions)
+
+def pickRandPartition(num_partitions):
+    return randNumInRange(num_partitions - 1)
+
+def randNumInRange(maxRangeVal):
+    # zero is min rangeval
+    if maxRangeVal <= 0:
+        return 0
+
+    val = 0
+    while True:
+        val = int(np.floor(abs(np.random.randn(1)[0]) * maxRangeVal))
+        if val >= 0 and val <= maxRangeVal:
+            break
+    return val
 
 def genArray(arr_length, defaultVal = 0):
     arr = []
