@@ -4,8 +4,8 @@ import sys
 import numpy as np
 import networkx as nx
 
-import patoh.patoh as pat
-import patoh.patoh_data as patdata
+import graph_partitioning.partitioners.patoh.patoh as pat
+import graph_partitioning.partitioners.patoh.patoh_data as patdata
 
 class PatohPartitioner():
     def __init__(self, lib_path, quiet = True):
@@ -13,6 +13,7 @@ class PatohPartitioner():
         self._quiet = quiet
 
         self.lib = pat.LibPatoh(self.PATOH_LIB_PATH)
+        self.lib.load()
 
     def generate_prediction_model(self,
                                   graph,
@@ -61,14 +62,14 @@ class PatohPartitioner():
         # read hypergraph... (should be OK above)
 
         # initialize parameters
-        patohdata.params = self.lib.initializeParameters(num_partitions)
-        if patohdata.params is None:
+        ok = self.lib.initializeParameters(patohdata, num_partitions)
+        if ok == False:
             # TODO throw exception...?
             print('Cannot Initialize PaToH parameters.')
             return assignments
 
         # check parameters
-        if self.lib.checkUserParameters(patohdata.params, not self._quiet) == False:
+        if self.lib.checkUserParameters(patohdata, not self._quiet) == False:
             print('Error with PaToH parameters.')
             return assignments
 
