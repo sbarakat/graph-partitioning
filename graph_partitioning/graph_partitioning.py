@@ -103,7 +103,7 @@ class GraphPartitioning:
                     print("SCOTCH partitioner loaded for making shelter assignments.")
 
         if self.PREDICTION_MODEL_ALGORITHM == 'PATOH':
-            sys.path.insert(0, self.SCOTCH_PYLIB_REL_PATH)
+            #sys.path.insert(0, self.SCOTCH_PYLIB_REL_PATH)
 
             # check if the library is present
             if not os.path.isfile(self.PATOH_LIB_PATH):
