@@ -102,12 +102,29 @@ class GraphPartitioning:
                 if not self._quiet:
                     print("SCOTCH partitioner loaded for making shelter assignments.")
 
+        if self.PREDICTION_MODEL_ALGORITHM == 'PATOH':
+            sys.path.insert(0, self.SCOTCH_PYLIB_REL_PATH)
+
+            # check if the library is present
+            if not os.path.isfile(self.PATOH_LIB_PATH):
+                raise ImportError("Could not locate the PaToH library file at: {}".format(self.PATOH_LIB_PATH))
+
+            from graph_partitioning import patoh_partitioner
+
+            self.prediction_model_algorithm = patoh_partitioner.PatohPartitioner(self.PATOH_LIB_PATH, quiet=self._quiet)
+            if not self._quiet:
+                print("PaToH partitioner loaded for generating PREDICTION MODEL.")
+
+            if self.PARTITIONER_ALGORITHM == 'PATOH':
+                # use the same prediction_model_algorithm for both batch and prediction modes
+                self.partition_algorithm = self.prediction_model_algorithm
+                if not self._quiet:
+                    print("PaToH partitioner loaded for making shelter assignments.")
+
         if self.prediction_model_algorithm == None:
             raise NoPartitionerException("Prediction model partitioner not specified or incorrect. Available partitioners are 'FENNEL' or 'SCOTCH'.")
         if self.partition_algorithm == None:
             raise NoPartitionerException("Assignment partitioner not specified or incorrect. Available partitioners is 'FENNEL'.")
-
-
 
     def reset(self):
 
@@ -595,4 +612,3 @@ class GraphPartitioning:
 
             csv_file = os.path.join(self.OUTPUT_DIRECTORY, "metrics-partitions-nonoverlapping.csv")
             utils.write_metrics_csv(csv_file, partition_nonoverlapping_fieldnames, partition_nonoverlapping_metrics)
-

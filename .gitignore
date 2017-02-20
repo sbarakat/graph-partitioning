@@ -7,4 +7,6 @@ output/
 *.swp
 *.class
 
+PaToH.log.*
+
 config.py
