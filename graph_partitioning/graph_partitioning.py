@@ -568,7 +568,7 @@ class GraphPartitioning:
             partition_nonoverlapping_metrics.update({"network_permanence": max_perm})
 
             # Modularity
-            mod = utils.modularity(Gsub)
+            mod = utils.modularity(Gsub, True)
             partition_nonoverlapping_metrics.update({"modularity": mod})
 
             # Community Quality metrics

@@ -209,8 +209,11 @@ def base_metrics(G, assignments=None):
 
     return (edges_cut, steps, mod)
 
-def modularity(G):
-    part = dict([(n[0], int(n[1]['partition'])) for n in G.nodes(data=True)])
+def modularity(G, best_partition=False):
+    if best_partition:
+        part = community.best_partition(G)
+    else:
+        part = dict([(n[0], int(n[1]['partition'])) for n in G.nodes(data=True)])
     mod = community.modularity(part, G)
     return mod
 
