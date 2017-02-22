@@ -10,11 +10,12 @@ import graph_partitioning.partitioners.patoh.patoh as pat
 import graph_partitioning.partitioners.patoh.patoh_data as patdata
 
 class PatohPartitioner():
-    def __init__(self, lib_path, quiet = True, partitioningIterations = 5):
+    def __init__(self, lib_path, quiet = True, partitioningIterations = 5, hyperedgeExpansionMode = 'no_expansion'):
         self.PATOH_LIB_PATH = lib_path
         self._quiet = quiet
 
         self.partitioningIterations = partitioningIterations
+        self.hyperedgeExpansionMode = hyperedgeExpansionMode
 
         self.lib = pat.LibPatoh(self.PATOH_LIB_PATH)
         self.lib.load()
@@ -37,6 +38,7 @@ class PatohPartitioner():
             G.add_node(node_indeces[node])
             try:
                 G.node[node_indeces[node]]['weight'] = graph.node[node]['weight']
+                #print("G.node[node_indeces[node]]['weight']", G.node[node_indeces[node]]['weight'])
             except Exception as err:
                 pass
 
@@ -90,7 +92,7 @@ class PatohPartitioner():
 
         # create the PaToH data
         patohdata = patdata.PatohData()
-        patohdata.fromNetworkxGraph(G, num_partitions, partvec=patoh_assignments_copy)
+        patohdata.fromNetworkxGraph(G, num_partitions, partvec=patoh_assignments_copy, hyperedgeExpansionMode=self.hyperedgeExpansionMode)
         # initialize parameters
         ok = self.lib.initializeParameters(patohdata, num_partitions)
         if ok == False:
@@ -99,6 +101,7 @@ class PatohPartitioner():
 
         patohdata.params.seed = int(time.time() * 1000)
         #print('seed', patohdata.params.seed)
+        #print(patohdata._nwghts)
 
         # check parameters
         if self.lib.checkUserParameters(patohdata, not self._quiet) == False:

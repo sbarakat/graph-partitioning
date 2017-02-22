@@ -59,7 +59,7 @@ class PatohData:
         print('_targetweights', self._targetweights, self._targetweights.ctypes)
         print('_partweights', self._partweights, self._partweights.ctypes)
 
-    def fromNetworkxGraph(self, G, num_partitions, partvec = None):
+    def fromNetworkxGraph(self, G, num_partitions, partvec = None, hyperedgeExpansionMode='no_expansion'):
         ''' Populates the PaToH data from a networkx graph '''
 
         if(isinstance(G, nx.Graph) == False):
@@ -88,15 +88,48 @@ class PatohData:
         for cliqueID, clique in enumerate(cliques):
             self.xpins[cliqueID] = len(self.pins)
 
+            node_weights = []
+            clique_edge_weights = []
+
+            edges_added = []
+
             for node in clique:
                 # set the node weight
                 try:
-                    weight = G[node]['weight']
-                    self.cwhgts[node] = weight
+                    weight = G.node[node]['weight']
+                    #node_weights.append(weight)
+                    self.cwghts[node] = weight
                 except Exception as err:
+                    #print('node weight exception', err)
+                    #node_weights.append(1)
                     pass
 
+                for edgeID in G.neighbors(node):
+                    # make sure each edge is counted only once
+                    edge_str = str(node)
+                    if edgeID > node:
+                        edge_str = edge_str + '_' + str(edgeID)
+                    else:
+                        edge_str = str(edgeID) + '_' + edge_str
+
+                    if edge_str in edges_added:
+                        continue
+                    else:
+                        edges_added.append(edge_str)
+
+                    try:
+                        eWeight = G[node][edgeID]['weight']
+                        clique_edge_weights.append(eWeight)
+                    except Exception as err:
+                        print('clique edge error', err)
+
                 self.pins.append(node)
+            # compute clique edge expansion
+            hyperedgeWeight = self._hyperedgeExpansion(clique_edge_weights, hyperedgeExpansionMode)
+
+            #print('hyperedge', len(clique), hyperedgeExpansionMode, hyperedgeWeight)
+
+            self.nwghts[cliqueID] = hyperedgeWeight
 
         # add last ID
         self.xpins[self._n] = len(self.pins)
@@ -130,3 +163,51 @@ class PatohData:
 
         self._targetweights = putils.exportArrayToNumpyArray(self.targetweights, dtype=np.float32)
         self._partweights = putils.exportArrayToNumpyArray(self.partweights)
+
+
+    def _hyperedgeExpansion(self, hyperedge_edge_weights, hyperedgeExpansionMode):
+        ''' Net is the clique (hyperedge) '''
+        '''
+        1. average node weights on hyperedge
+        2. total node weights
+        3. smallest node weights
+        4. largest node weight
+        5. product of the node weights
+        6. see explanation
+        7. square of the above or sqrt
+        8. not add any extra calculation
+        '''
+        if 'no_expansion' in hyperedgeExpansionMode:
+            return 1
+
+        hyperedgeWeight = 0.0
+        for i, edgeWeight in enumerate(hyperedge_edge_weights):
+            if 'avg_edge_weight' in hyperedgeExpansionMode:
+                hyperedgeWeight += edgeWeight
+                if ((i + 1) == len(hyperedge_edge_weights)):
+                    # last item
+                    hyperedgeWeight = hyperedgeWeight / len(hyperedge_edge_weights)
+            elif 'total_edge_weight' in hyperedgeExpansionMode:
+                hyperedgeWeight += edgeWeight
+            elif 'smallest_edge_weight':
+                if i == 0:
+                    hyperedgeWeight = edgeWeight
+                else:
+                    if edgeWeight < hyperedgeWeight:
+                        hyperedgeWeight = edgeWeight
+            elif 'largest_edge_weight':
+                if i == 0:
+                    hyperedgeWeight = edgeWeight
+                else:
+                    if edgeWeight > hyperedgeWeight:
+                        hyperedgeWeight = nodeWeight
+
+
+        if 'squared' in hyperedgeExpansionMode:
+            # take the square root
+            hyperedgeWeight = hyperedgeWeight ** 2.0
+
+        if 'sqrt' in hyperedgeExpansionMode:
+            hyperedgeWeight = hyperedgeWeight ** 0.5
+
+        return round(hyperedgeWeight)
