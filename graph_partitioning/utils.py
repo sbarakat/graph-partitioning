@@ -108,7 +108,7 @@ rpy2_loaded = False
 base = None
 utils = None
 mgcv = None
-def gam_predict(population_csv, num_arrived, k_value):
+def gam_predict(location_csv, prediction_file, num_arrived, k_value):
 
     if not rpy2_loaded:
         from rpy2.robjects import Formula
@@ -116,19 +116,24 @@ def gam_predict(population_csv, num_arrived, k_value):
         base = importr('base')
         utils = importr('utils')
         mgcv = importr('mgcv')
-        filename = os.path.basename(population_csv)
+        location_filename = os.path.basename(location_csv)
+        prediction_filename = os.path.basename(prediction_file)
 
     # Setup
-    base.setwd(os.path.dirname(population_csv))
-    population = utils.read_csv(filename, header=False, nrows=num_arrived)
-    population.colnames = ["shelter","x","y"]
+    base.setwd(os.path.dirname(location_csv))
+    loc = utils.read_csv(location_filename, header=False, nrows=num_arrived)
+    pred = utils.read_csv(prediction_filename, header=False, nrows=num_arrived)
+    pop = base.cbind(pred, loc)
+    pop.colnames = ["shelter","x","y"]
 
     # GAM
     formula = Formula('shelter~s(x,y,k={})'.format(k_value))
-    m = mgcv.gam(formula, family="binomial", method="REML", data=population)
+    m = mgcv.gam(formula, family="binomial", method="REML", data=pop)
 
     # Predict for everyone
-    newd = utils.read_csv(filename, header=False)
+    loc = utils.read_csv(location_filename, header=False)
+    pred = utils.read_csv(prediction_filename, header=False)
+    newd = base.cbind(pred, loc)
     newd.colnames = ["shelter","x","y"]
     result = mgcv.predict_gam(m, newd, type="response", se_fit=False)
 

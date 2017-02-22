@@ -298,7 +298,10 @@ class GraphPartitioning:
                         else:
                             k = self.gam_k_value
 
-                        gam_weights = utils.gam_predict(self.POPULATION_LOCATION_FILE, len(total_arrived), k)
+                        gam_weights = utils.gam_predict(self.POPULATION_LOCATION_FILE,
+                                                        self.PREDICTION_LIST_FILE,
+                                                        len(total_arrived),
+                                                        k)
 
                         for node in self.G.nodes_iter():
                             if self.alter_arrived_node_weight_to_100 and node in total_arrived:
