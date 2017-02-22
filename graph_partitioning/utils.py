@@ -223,6 +223,18 @@ def modularity(G, best_partition=False):
     return mod
 
 
+def loneliness_score(G, loneliness_score_param):
+    total = 0
+    count = 0
+    for n in G.nodes():
+        node_edges = len(G[n])
+        score = 1 - ((1 / (node_edges + 1)**loneliness_score_param))
+        total += score
+        count += 1
+
+    # average for partition
+    return total / count
+
 def run_max_perm(edges_maxperm_filename):
     max_perm = 0.0
     temp_dir = tempfile.mkdtemp()

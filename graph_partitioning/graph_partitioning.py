@@ -520,6 +520,7 @@ class GraphPartitioning:
             "partition",
             "population",
             "modularity",
+            "loneliness_score",
             "network_permanence",
         ]
         partition_overlapping_fieldnames = [
@@ -573,6 +574,10 @@ class GraphPartitioning:
             # Modularity
             mod = utils.modularity(Gsub, True)
             partition_nonoverlapping_metrics.update({"modularity": mod})
+
+            # Loneliness Score
+            score = utils.loneliness_score(Gsub, self.loneliness_score_param)
+            partition_nonoverlapping_metrics.update({"loneliness_score": score})
 
             # Community Quality metrics
             community_metrics = utils.run_community_metrics(self.OUTPUT_DIRECTORY,
