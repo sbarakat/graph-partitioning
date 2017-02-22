@@ -4,6 +4,8 @@ import networkx as nx
 import graph_partitioning.partitioners.utils as putils
 
 class PatohData:
+    ''' This class stores all the data and arrays used by PaToH during partitioning '''
+
     def __init__(self):
         self.initialize()
 
@@ -58,6 +60,8 @@ class PatohData:
         print('_partweights', self._partweights, self._partweights.ctypes)
 
     def fromNetworkxGraph(self, G, num_partitions, partvec = None):
+        ''' Populates the PaToH data from a networkx graph '''
+
         if(isinstance(G, nx.Graph) == False):
             return False
 
@@ -85,7 +89,15 @@ class PatohData:
             self.xpins[cliqueID] = len(self.pins)
 
             for node in clique:
+                # set the node weight
+                try:
+                    weight = G[node]['weight']
+                    self.cwhgts[node] = weight
+                except Exception as err:
+                    pass
+
                 self.pins.append(node)
+
         # add last ID
         self.xpins[self._n] = len(self.pins)
 
@@ -93,7 +105,7 @@ class PatohData:
             self.useFixCells = 1
             self.partvec = partvec
 
-        self._setTargetWeights(num_partitions)
+        self._setTargetPartitionWeights(num_partitions)
 
         self._exportArrays()
 
@@ -102,10 +114,11 @@ class PatohData:
             return None
         return list(nx.find_cliques(G))
 
-    def _setTargetWeights(self, num_partitions):
+    def _setTargetPartitionWeights(self, num_partitions):
         target = 1.0 / float(num_partitions)
         for k in range(0, num_partitions):
             self.targetweights.append(target)
+
         self.partweights = putils.genArray(num_partitions * self._nconst, 0)
 
     def _exportArrays(self):

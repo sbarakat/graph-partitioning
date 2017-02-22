@@ -3,6 +3,42 @@ import ctypes
 import graph_partitioning.partitioners.utils as putils
 from graph_partitioning.partitioners.patoh.parameters import PATOHParameters
 
+'''
+Usage:
+
+# Load the library
+libPath = 'path/to/libpatoh.dylib' # .so for linux
+lib = LibPatoh(libraryPath = libPath)
+lib.load()
+
+# Check library is Loaded
+if lib.libIsLoaded() == False:
+    throw Exception(...)
+
+# Prepare the data for partitioning
+
+G = nx.Graph()
+... load data into G ...
+
+fixedNodes = None
+... if some of the nodes are already fixed ...
+fixedNodes = [-1 -1 0 -1 -1 2 -1 ... ]
+
+
+data = PatohData()
+data.fromNetworkxGraph(G, num_partitions = 4, partvec = partvec)
+
+# Perform partitioning
+lib.initializeParameters(data, num_partitions)
+if lib.checkUserParameters(data, verbose = True):
+    if lib.alloc(data) == True:
+        if lib.part(data) == True:
+            # do something with partition data...
+        # free memory
+        lib.free(data)
+'''
+
+
 class LibPatoh(putils.CLibInterface):
     def __init__(self, libraryPath = None):
         super().__init__(libraryPath=libraryPath)
@@ -62,7 +98,7 @@ class LibPatoh(putils.CLibInterface):
         # perform parameter check
         ok = self.PATOH_checkUserParameters(ctypes.byref(patohData.params), v)
         if(ok == 0):
-            print('User Parameters Valid')
+            #print('User Parameters Valid')
             return True
         else:
             print('Error in the user parameters. Use verbose mode for greater details.')

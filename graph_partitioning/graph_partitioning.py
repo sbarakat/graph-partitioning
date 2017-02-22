@@ -111,7 +111,7 @@ class GraphPartitioning:
 
             from graph_partitioning import patoh_partitioner
 
-            self.prediction_model_algorithm = patoh_partitioner.PatohPartitioner(self.PATOH_LIB_PATH, quiet=self._quiet)
+            self.prediction_model_algorithm = patoh_partitioner.PatohPartitioner(self.PATOH_LIB_PATH, quiet=self._quiet, partitioningIterations=self.PATOH_ITERATIONS)
             if not self._quiet:
                 print("PaToH partitioner loaded for generating PREDICTION MODEL.")
 

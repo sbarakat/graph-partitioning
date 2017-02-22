@@ -1,7 +1,6 @@
-import ctypes
+import ctypes # used for accessing the dynamic library
 
-import graph_partitioning.partitioners.utils as putils
-
+import graph_partitioning.partitioners.utils as putils # used for some of the utilities functions
 
 class LibScotch(putils.CLibInterface):
     def __init__(self, libraryPath = None):

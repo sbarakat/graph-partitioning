@@ -1,16 +1,20 @@
 import os
 import sys
+import time # for PaToH's seed
 
 import numpy as np
 import networkx as nx
 
+import graph_partitioning.utils as gputils
 import graph_partitioning.partitioners.patoh.patoh as pat
 import graph_partitioning.partitioners.patoh.patoh_data as patdata
 
 class PatohPartitioner():
-    def __init__(self, lib_path, quiet = True):
+    def __init__(self, lib_path, quiet = True, partitioningIterations = 5):
         self.PATOH_LIB_PATH = lib_path
         self._quiet = quiet
+
+        self.partitioningIterations = partitioningIterations
 
         self.lib = pat.LibPatoh(self.PATOH_LIB_PATH)
         self.lib.load()
@@ -56,6 +60,33 @@ class PatohPartitioner():
                 # add node's fixed partition, if present
                 patoh_assignments.append(assignment)
 
+        iterations = {}
+        for i in range(0, self.partitioningIterations):
+
+            # perform an iteration of partitioning
+            _assignments = self._runPartitioning(G, num_partitions, patoh_assignments, node_indeces, assignments)
+            # compute the edges cut
+            edges_cut, steps, mod = gputils.base_metrics(graph, _assignments)
+            if edges_cut not in list(iterations.keys()):
+                iterations[edges_cut] = _assignments
+
+        # return the minimum edges cut
+        minEdgesCut = graph.number_of_nodes()
+        for key in list(iterations.keys()):
+            if key < minEdgesCut:
+                minEdgesCut = key
+
+        assignments = iterations[minEdgesCut]
+
+        self._printIterationStats(iterations)
+        del iterations
+
+        return assignments
+
+        # *****************
+        #    DEPRECATED
+        # *****************
+
         patohdata = patdata.PatohData()
         patohdata.fromNetworkxGraph(G, num_partitions, partvec=patoh_assignments)
 
@@ -64,7 +95,6 @@ class PatohPartitioner():
         # initialize parameters
         ok = self.lib.initializeParameters(patohdata, num_partitions)
         if ok == False:
-            # TODO throw exception...?
             print('Cannot Initialize PaToH parameters.')
             return assignments
 
@@ -89,9 +119,66 @@ class PatohPartitioner():
 
         # free...
         self.lib.free(patohdata)
+        del patohdata
         patohdata = None
 
         return assignments
+
+    def _runPartitioning(self, G, num_partitions, patoh_assignments, node_indeces, input_assignments):
+        # make a copy of arrays
+        patoh_assignments_copy = np.array(patoh_assignments, copy=True).tolist()
+        assignments = np.array(input_assignments, copy=True)
+
+        # create the PaToH data
+        patohdata = patdata.PatohData()
+        patohdata.fromNetworkxGraph(G, num_partitions, partvec=patoh_assignments_copy)
+        # initialize parameters
+        ok = self.lib.initializeParameters(patohdata, num_partitions)
+        if ok == False:
+            print('Cannot Initialize PaToH parameters.')
+            return assignments
+
+        patohdata.params.seed = int(time.time() * 1000)
+        #print('seed', patohdata.params.seed)
+
+        # check parameters
+        if self.lib.checkUserParameters(patohdata, not self._quiet) == False:
+            print('Error with PaToH parameters.')
+            return assignments
+
+        # alloc
+        if self.lib.alloc(patohdata) == False:
+            print('Error Allocating Memory for PaToH')
+            return assignments
+
+        # partition
+        ok = self.lib.part(patohdata)
+        if ok == True:
+            # make a copy of the array
+            #patoh_assignments = np.array(patohdata._partvec, copy=True)
+            # re-map patoh_assignments back to assignments
+            for oldNode, newNode in enumerate(node_indeces):
+                assignments[oldNode] = patohdata._partvec[newNode]
+
+        # free...
+        self.lib.free(patohdata)
+        del patohdata
+        patohdata = None
+
+        return assignments
+
+    def _printIterationStats(self, iterations):
+        if self._quiet == False:
+
+            min_cuts = 1000000000
+            max_cuts = 0
+
+            for cuts in list(iterations.keys()):
+                if cuts < min_cuts:
+                    min_cuts = cuts
+                if cuts > max_cuts:
+                    max_cuts = cuts
+            print('Ran PaToH for', self.partitioningIterations, 'iterations with min_cuts =', min_cuts, 'and max_cuts =', max_cuts, ' - picked min_cuts assignements.')
 
     def _createGraphIndeces(self, graph, originalNodeNum):
         '''

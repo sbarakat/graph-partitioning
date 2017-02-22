@@ -3,6 +3,8 @@ import ctypes
 # http://stackoverflow.com/questions/4351721/python-ctypes-passing-a-struct-to-a-function-as-a-pointer-to-get-back-data
 
 class PATOHParameters(ctypes.Structure):
+    ''' Class that represents the PaToH Parameters struct '''
+
     _fields_ = [
         ("cuttype",ctypes.c_int),
         ("_k",ctypes.c_int),

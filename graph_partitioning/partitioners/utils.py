@@ -6,7 +6,8 @@ from pathlib import Path
 import numpy as np
 
 def minPartitionCounts(assignments, num_partitions):
-    #print(assignments)
+    ''' Makes a count of each node assigned to each partition. Returns the partition with the smallest count
+    and a dictionary indexing the counts for each partition: partitions[partition_id] = totalNodesInPartition '''
     partitions = {}
     for i in range(num_partitions):
         partitions[i] = 0
@@ -32,10 +33,11 @@ def minPartitionCounts(assignments, num_partitions):
     return (minCountPartition, partitions)
 
 def pickRandPartition(num_partitions):
+    ''' Picks a random number in range 0 to num_partitions - 1 '''
     return randNumInRange(num_partitions - 1)
 
 def randNumInRange(maxRangeVal):
-    # zero is min rangeval
+    ''' Picks a random number between 0 and maxRangeVal '''
     if maxRangeVal <= 0:
         return 0
 
@@ -47,6 +49,7 @@ def randNumInRange(maxRangeVal):
     return val
 
 def genArray(arr_length, defaultVal = 0):
+    ''' Generates an array list of length arr_length filled of values = defaultVal '''
     arr = []
     for i in range(0, arr_length):
         arr.append(defaultVal)
@@ -55,11 +58,13 @@ def genArray(arr_length, defaultVal = 0):
     return arr
 
 def exportArrayToNumpyArray(array, dtype=np.int32):
-    if array is None:
+    ''' Converts an array list to a numpy array '''
+    if (array is None) or (isinstance(array, list) == False):
         array = []
     return np.asanyarray(array, dtype=dtype)
 
 def getOS():
+    ''' Returns the current operating system as macOS or linux '''
     if 'Darwin' in platform.system():
         return 'macOS'
     elif 'Linux' in platform.system():
@@ -68,16 +73,19 @@ def getOS():
         return ''
 
 def isLinux():
+    ''' Returns True if this system is Linux '''
     if getOS() == 'linux':
         return True
     return False
 
 def isMacOS():
+    ''' Returns True if this system is macOS '''
     if getOS() == 'macOS':
         return True
     return False
 
 def defaultSCOTCHLibraryPath():
+    ''' Returns the default path to the SCOTCH dynamic library for macOS and linux '''
     if isLinux():
         return '/usr/local/lib/scotch_604/libscotch.so'
     if isMacOS():
@@ -85,6 +93,7 @@ def defaultSCOTCHLibraryPath():
     return ''
 
 def defaultPATOHLibraryPath():
+    ''' Returns the default path to the PaToH dynamic library for macOS and linux '''
     if isLinux():
         return os.path.join(str(Path(__file__).parents[2]), 'libs/patoh/lib/linux/libpatoh.so')
     if isMacOS():
@@ -96,6 +105,8 @@ class CLibLoadException(Exception):
 
 
 class CLibInterface:
+    ''' Base class that acts as an interface to load C/C++ Dynamic Libraries using ctypes '''
+
     def __init__(self, libraryPath = None):
         if libraryPath is None:
             libraryPath = self._getDefaultLibPath()
@@ -104,15 +115,24 @@ class CLibInterface:
         self.clib = None
 
     def _getDefaultLibPath(self):
+        ''' Base function to get the default path for the library. Must be re-implemented by child classes '''
         return ''
 
     def _loadLibraryFunctions(self):
+        ''' Base function to load the library's desired functions. Must be re-implemented by child classes '''
+        return True
+
+    def libIsLoaded(self):
+        if self.clib is None:
+            return False
         return True
 
     def load(self):
+        ''' Base function that loads a ctypes Dynamic Library, then loads the library functions. Exception safe. '''
         try:
             self.clib = ctypes.cdll.LoadLibrary(self.libraryPath)
             self._loadLibraryFunctions()
             return True
         except Exception as err:
             print('Error loading library at path', self.libraryPath, '; error:', err)
+            self.clib = None
