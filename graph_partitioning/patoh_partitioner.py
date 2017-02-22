@@ -83,47 +83,6 @@ class PatohPartitioner():
 
         return assignments
 
-        # *****************
-        #    DEPRECATED
-        # *****************
-
-        patohdata = patdata.PatohData()
-        patohdata.fromNetworkxGraph(G, num_partitions, partvec=patoh_assignments)
-
-        # read hypergraph... (should be OK above)
-
-        # initialize parameters
-        ok = self.lib.initializeParameters(patohdata, num_partitions)
-        if ok == False:
-            print('Cannot Initialize PaToH parameters.')
-            return assignments
-
-        # check parameters
-        if self.lib.checkUserParameters(patohdata, not self._quiet) == False:
-            print('Error with PaToH parameters.')
-            return assignments
-
-        # alloc
-        if self.lib.alloc(patohdata) == False:
-            print('Error Allocating Memory for PaToH')
-            return assignments
-
-        # partition
-        ok = self.lib.part(patohdata)
-        if ok == True:
-            # make a copy of the array
-            #patoh_assignments = np.array(patohdata._partvec, copy=True)
-            # re-map patoh_assignments back to assignments
-            for oldNode, newNode in enumerate(node_indeces):
-                assignments[oldNode] = patohdata._partvec[newNode]
-
-        # free...
-        self.lib.free(patohdata)
-        del patohdata
-        patohdata = None
-
-        return assignments
-
     def _runPartitioning(self, G, num_partitions, patoh_assignments, node_indeces, input_assignments):
         # make a copy of arrays
         patoh_assignments_copy = np.array(patoh_assignments, copy=True).tolist()
