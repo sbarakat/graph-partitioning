@@ -251,14 +251,31 @@ def complete_loneliness_score(G, loneliness_score_param, assignments, num_partit
     return np.average(partition_score, weights=partition_population)
 
 
-def run_max_perm(edges_maxperm_filename):
+def run_max_perm(G, relabel_nodes=False):
     max_perm = 0.0
     temp_dir = tempfile.mkdtemp()
-    with open(edges_maxperm_filename, "r") as edge_file:
+    edges_filename = os.path.join(temp_dir, "edges-maxperm.txt")
+
+    # MaxPerm requires nodes in sequential order
+    if relabel_nodes:
+        mapping = dict(zip(G.nodes(), range(0, len(G.nodes()))))
+        nx.relabel_nodes(G, mapping, copy=False)
+
+    # write edge list in a format for MaxPerm, tab delimited
+    with open(edges_filename, "w") as outf:
+        outf.write("{}\t{}\n".format(G.number_of_nodes(), G.number_of_edges()))
+        for e in sorted(G.edges_iter()):
+            outf.write("{}\t{}\n".format(*e))
+
+    # cat edge list into MaxPerm bin
+    with open(edges_filename, "r") as edge_file:
         args = [os.path.join(BIN_DIRECTORY, "MaxPerm", "MaxPerm")]
-        retval = subprocess.call(
-            args, cwd=temp_dir, stdin=edge_file,
-            stderr=subprocess.STDOUT)
+        with open(os.devnull, "w") as devnull:
+            retval = subprocess.call(
+                args, cwd=temp_dir, stdin=edge_file,
+                stdout=devnull)
+
+    # parse the output file to get the permanence metric
     with open(os.path.join(temp_dir, "output.txt"), "r") as fp:
         for i, line in enumerate(fp):
             if "Network Permanence" in line:
@@ -354,8 +371,6 @@ def write_graph_files(output_path, data_filename, G, quiet=False, relabel_nodes=
         os.makedirs(output_path)
     if not os.path.exists(os.path.join(output_path, 'oslom')):
         os.makedirs(os.path.join(output_path, 'oslom'))
-    if not os.path.exists(os.path.join(output_path, 'maxperm')):
-        os.makedirs(os.path.join(output_path, 'maxperm'))
     if not os.path.exists(os.path.join(output_path, 'graphs')):
         os.makedirs(os.path.join(output_path, 'graphs'))
 
@@ -375,25 +390,12 @@ def write_graph_files(output_path, data_filename, G, quiet=False, relabel_nodes=
         for e in G.edges_iter(data=True):
             outf.write("{}\t{}\t{}\n".format(e[0], e[1], e[2]["weight"]))
 
-    # MaxPerm requires nodes in sequential order
-    if relabel_nodes:
-        mapping = dict(zip(G.nodes(), range(0, len(G.nodes()))))
-        nx.relabel_nodes(G, mapping, copy=False)
-
-    # write edge list in a format for MaxPerm, tab delimited
-    edges_maxperm_filename = os.path.join(output_path, 'maxperm', data_filename + "-edges-maxperm.txt")
-    with open(edges_maxperm_filename, "w") as outf:
-        outf.write("{}\t{}\n".format(G.number_of_nodes(), G.number_of_edges()))
-        for e in sorted(G.edges_iter()):
-            outf.write("{}\t{}\n".format(*e))
-
     if not quiet:
         print("Writing GML file: {}".format(gml_filename))
         print("Writing assignments: {}".format(assignments_filename))
-        print("Writing edge list (for MaxPerm): {}".format(edges_maxperm_filename))
         print("Writing edge list (for OSLOM): {}".format(edges_oslom_filename))
 
-    return (edges_maxperm_filename, edges_oslom_filename)
+    return edges_oslom_filename
 
 def write_metrics_csv(filename, fields, metrics):
     if not os.path.exists(filename):

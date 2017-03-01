@@ -469,10 +469,10 @@ class GraphPartitioning:
 
         if self.verbose > 0:
             print("Complete graph with {} nodes".format(self.G.number_of_nodes()))
-        (file_maxperm, file_oslom) = utils.write_graph_files(self.OUTPUT_DIRECTORY,
-                                                             "{}-all".format(self.metrics_filename),
-                                                             self.G,
-                                                             quiet=True)
+        file_oslom = utils.write_graph_files(self.OUTPUT_DIRECTORY,
+                                             "{}-all".format(self.metrics_filename),
+                                             self.G,
+                                             quiet=True)
 
         # original scoring algorithm
         scoring = utils.score(self.G, self.assignments, self.num_partitions)
@@ -489,7 +489,7 @@ class GraphPartitioning:
         })
 
         # MaxPerm
-        max_perm = utils.run_max_perm(file_maxperm)
+        max_perm = utils.run_max_perm(self.G)
         graph_metrics.update({"network_permanence": max_perm})
 
         # Community Quality metrics
@@ -563,14 +563,13 @@ class GraphPartitioning:
                 print("\nPartition {} with {} nodes".format(p, Gsub.number_of_nodes()))
                 print("-----------------------------\n")
 
-            (file_maxperm, file_oslom) = utils.write_graph_files(self.OUTPUT_DIRECTORY,
-                                                                 "{}-p{}".format(self.metrics_filename, p),
-                                                                 Gsub,
-                                                                 quiet=True,
-                                                                 relabel_nodes=True)
+            file_oslom = utils.write_graph_files(self.OUTPUT_DIRECTORY,
+                                                 "{}-p{}".format(self.metrics_filename, p),
+                                                 Gsub,
+                                                 quiet=True)
 
             # MaxPerm
-            max_perm = utils.run_max_perm(file_maxperm)
+            max_perm = utils.run_max_perm(Gsub, relabel_nodes=True)
             partition_nonoverlapping_metrics.update({"network_permanence": max_perm})
 
             # Modularity
