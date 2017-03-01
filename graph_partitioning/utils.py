@@ -261,8 +261,8 @@ def run_community_metrics(output_path, data_filename, edges_oslom_filename):
     """
     temp_dir = tempfile.mkdtemp()
     oslom_bin = os.path.join(BIN_DIRECTORY, "OSLOM2", "oslom_dir")
-    oslom_log = os.path.join(output_path, data_filename + "-oslom.log")
-    oslom_modules = os.path.join(output_path, data_filename + "-oslom-tp.txt")
+    oslom_log = os.path.join(output_path, 'oslom', data_filename + "-oslom.log")
+    oslom_modules = os.path.join(output_path, 'oslom', data_filename + "-oslom-tp.txt")
     args = [oslom_bin, "-f", edges_oslom_filename, "-w", "-r", "10", "-hr", "50"]
     with open(oslom_log, "w") as logwriter:
         retval = subprocess.call(
@@ -272,7 +272,7 @@ def run_community_metrics(output_path, data_filename, edges_oslom_filename):
     shutil.rmtree(temp_dir)
 
     com_qual_path = os.path.join(BIN_DIRECTORY, "ComQualityMetric")
-    com_qual_log = os.path.join(output_path, data_filename + "-CommunityQuality.log")
+    com_qual_log = os.path.join(output_path, 'oslom', data_filename + "-CommunityQuality.log")
     args = ["java", "OverlappingCommunityQuality", "-weighted", edges_oslom_filename, oslom_modules]
     with open(com_qual_log, "w") as logwriter:
         retval = subprocess.call(
@@ -351,19 +351,25 @@ def write_graph_files(output_path, data_filename, G, quiet=False, relabel_nodes=
 
     if not os.path.exists(output_path):
         os.makedirs(output_path)
+    if not os.path.exists(os.path.join(output_path, 'oslom')):
+        os.makedirs(os.path.join(output_path, 'oslom'))
+    if not os.path.exists(os.path.join(output_path, 'maxperm')):
+        os.makedirs(os.path.join(output_path, 'maxperm'))
+    if not os.path.exists(os.path.join(output_path, 'graphs')):
+        os.makedirs(os.path.join(output_path, 'graphs'))
 
     # write to GML file
-    gml_filename = os.path.join(output_path, data_filename + "-graph.gml")
+    gml_filename = os.path.join(output_path, 'graphs', data_filename + "-graph.gml")
     nx.write_gml(G, gml_filename)
 
     # write assignments into a file with a single column
-    assignments_filename = os.path.join(output_path, data_filename + "-assignments.txt")
+    assignments_filename = os.path.join(output_path, 'graphs', data_filename + "-assignments.txt")
     with open(assignments_filename, "w") as outf:
         for n in G.nodes_iter(data=True):
             outf.write("{}\n".format(n[1]["partition"]))
 
     # write edge list in a format for OSLOM, tab delimited
-    edges_oslom_filename = os.path.join(output_path, data_filename + "-edges-oslom.txt")
+    edges_oslom_filename = os.path.join(output_path, 'oslom', data_filename + "-edges-oslom.txt")
     with open(edges_oslom_filename, "w") as outf:
         for e in G.edges_iter(data=True):
             outf.write("{}\t{}\t{}\n".format(e[0], e[1], e[2]["weight"]))
@@ -374,7 +380,7 @@ def write_graph_files(output_path, data_filename, G, quiet=False, relabel_nodes=
         nx.relabel_nodes(G, mapping, copy=False)
 
     # write edge list in a format for MaxPerm, tab delimited
-    edges_maxperm_filename = os.path.join(output_path, data_filename + "-edges-maxperm.txt")
+    edges_maxperm_filename = os.path.join(output_path, 'maxperm', data_filename + "-edges-maxperm.txt")
     with open(edges_maxperm_filename, "w") as outf:
         outf.write("{}\t{}\n".format(G.number_of_nodes(), G.number_of_edges()))
         for e in sorted(G.edges_iter()):
