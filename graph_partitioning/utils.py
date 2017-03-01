@@ -267,6 +267,7 @@ def run_max_perm(edges_maxperm_filename):
     shutil.rmtree(temp_dir)
     return max_perm
 
+
 def run_community_metrics(output_path, data_filename, edges_oslom_filename):
     """
     Community Quality metrics
@@ -346,22 +347,6 @@ def fixed_width_print(arr):
             print(" ", end='')
     print("]")
 
-def line_print(assignments):
-    for i in range(0, len(assignments)):
-        for b in range(i, len(assignments)):
-            if assignments[b] != -1:
-                break
-        if b != len(assignments)-1:
-            print("{} ".format(assignments[i]), end='')
-    print()
-
-# write to file
-def write_to_file(filename, assignments):
-    with open(filename, "w") as f:
-        j = 0
-        for a in assignments:
-            f.write("{} {}\n".format(j,a))
-            j += 1
 
 def write_graph_files(output_path, data_filename, G, quiet=False, relabel_nodes=False):
 
@@ -419,36 +404,3 @@ def write_metrics_csv(filename, fields, metrics):
         csv_writer = csv.DictWriter(outf, fieldnames=fields)
         csv_writer.writerow(metrics)
 
-
-def squash_partition(graph, partition_nodes, part, assignments):
-
-    H = graph.copy()
-    H.add_nodes_from(partition_nodes, weight=1)
-
-    del_nodes = []
-    add_edges = []
-    for n in H.edges_iter(data=True):
-        left = n[0]
-        right = n[1]
-        if assignments[left] == part and assignments[right] == part:
-            continue
-
-        elif assignments[left] == part and assignments[right] != part:
-            del_nodes += [right]
-            add_edges += [[left, partition_nodes[assignments[right]]]]
-
-        elif assignments[left] != part and assignments[right] == part:
-            del_nodes += [left]
-            add_edges += [[right, partition_nodes[assignments[left]]]]
-
-        elif assignments[left] != part and assignments[right] != part:
-            del_nodes += [left]
-            del_nodes += [right]
-
-    for d in list(set(del_nodes)):
-        H.remove_node(d)
-    for a in add_edges:
-        H.add_edge(a[0], a[1])
-    H.remove_node(partition_nodes[part])
-
-    return H
