@@ -235,6 +235,22 @@ def loneliness_score(G, loneliness_score_param):
     # average for partition
     return total / count
 
+def complete_loneliness_score(G, loneliness_score_param, assignments, num_partitions):
+    """
+    Return a weighted average across all partitions for loneliness score
+    """
+    p = get_partition_population(G, assignments, num_partitions)
+    partition_population = [p[x][0] for x in p]
+    partition_score = list(range(0, num_partitions))
+
+    for p in range(0, num_partitions):
+        nodes = [i for i,x in enumerate(assignments) if x == p]
+        Gsub = G.subgraph(nodes)
+        partition_score[p] = loneliness_score(Gsub, loneliness_score_param)
+
+    return np.average(partition_score, weights=partition_population)
+
+
 def run_max_perm(edges_maxperm_filename):
     max_perm = 0.0
     temp_dir = tempfile.mkdtemp()
