@@ -173,12 +173,16 @@ class GraphPartitioning:
     def _print_score(self, graph=None):
         if graph == None:
             graph = self.G
+
         x = utils.score(graph, self.assignments, self.num_partitions)
         edges_cut, steps, mod = utils.base_metrics(graph, self.assignments)
         loneliness = utils.complete_loneliness_score(self.G, self.loneliness_score_param, self.assignments, self.num_partitions)
+        max_perm = utils.run_max_perm(self.G)
+
         if self.verbose > 1:
-            print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4}\t{5}".format(x[0], x[1], edges_cut, steps, mod, loneliness))
-        return [x[0], x[1], edges_cut, steps, mod, loneliness]
+            print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4}\t{5}\t{6}".format(x[0], x[1], edges_cut, steps, mod, loneliness, max_perm))
+
+        return [x[0], x[1], edges_cut, steps, mod, loneliness, max_perm]
 
     def assign_cut_off(self):
 
