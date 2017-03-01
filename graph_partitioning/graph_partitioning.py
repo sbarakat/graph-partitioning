@@ -42,7 +42,7 @@ class GraphPartitioning:
             with open(self.SIMULATED_ARRIVAL_FILE, "r") as ar:
                 self.simulated_arrival_list = [int(line.rstrip('\n')) for line in ar]
 
-        if not self._quiet:
+        if self.verbose > 0:
             print("Graph loaded...")
             print(nx.info(self.G))
             if nx.is_directed(self.G):
@@ -73,12 +73,12 @@ class GraphPartitioning:
 
             if self.PREDICTION_MODEL_ALGORITHM == 'FENNEL':
                 self.prediction_model_algorithm = fennel.FennelPartitioner(self.prediction_model_alpha)
-                if not self._quiet:
+                if self.verbose > 0:
                     print("FENNEL partitioner loaded for generating PREDICTION MODEL.")
 
             if self.PARTITIONER_ALGORITHM == 'FENNEL':
                 self.partition_algorithm = fennel.FennelPartitioner()
-                if not self._quiet:
+                if self.verbose > 0:
                     print("FENNEL partitioner loaded for making shelter assignments.")
 
 
@@ -94,7 +94,7 @@ class GraphPartitioning:
 
             self.prediction_model_algorithm = scotch_partitioner.ScotchPartitioner(self.SCOTCH_LIB_PATH)
 
-            if not self._quiet:
+            if self.verbose > 0:
                 print("SCOTCH partitioner loaded for generating PREDICTION MODEL.")
 
         if self.prediction_model_algorithm == None:
@@ -123,14 +123,14 @@ class GraphPartitioning:
             self.G = self._edge_expansion(self.G)
             self.assignments = self.prediction_model_algorithm.generate_prediction_model(self.G, self.num_iterations, self.num_partitions, self.assignments, self.fixed)
 
-        if not self._quiet:
+        if self.verbose > 0:
             print("PREDICTION MODEL")
             print("----------------\n")
 
-        run_metrics = [self._print_score(quiet=True)]
+        run_metrics = [self._print_score()]
         self._print_assignments()
 
-        if not self._quiet:
+        if self.verbose > 0:
             nodes_fixed = len([o for o in self.fixed if o == 1])
             print("\nFixed: {}".format(nodes_fixed))
 
@@ -160,30 +160,30 @@ class GraphPartitioning:
         self.G.add_nodes_from(self.virtual_nodes, weight=1)
         self.G.add_edges_from(self.virtual_edges, weight=self.virtual_edge_weight)
 
-        if not self._quiet:
+        if self.verbose > 0:
             self._print_assignments()
             print("Last {} nodes are virtual nodes.".format(self.num_partitions))
 
 
     def _print_assignments(self):
-        if not self._quiet:
+        if self.verbose > 0:
             print("\nAssignments:")
             utils.fixed_width_print(self.assignments)
 
-    def _print_score(self, graph=None, quiet=False):
+    def _print_score(self, graph=None):
         if graph == None:
             graph = self.G
         x = utils.score(graph, self.assignments, self.num_partitions)
         edges_cut, steps, mod = utils.base_metrics(graph, self.assignments)
         loneliness = utils.complete_loneliness_score(self.G, self.loneliness_score_param, self.assignments, self.num_partitions)
-        if not quiet and not self._quiet:
+        if self.verbose > 1:
             print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4}\t{5}".format(x[0], x[1], edges_cut, steps, mod, loneliness))
         return [x[0], x[1], edges_cut, steps, mod, loneliness]
 
     def assign_cut_off(self):
 
         cut_off_value = int(self.prediction_model_cut_off * self.G.number_of_nodes())
-        if not self._quiet:
+        if self.verbose > 0:
             if self.prediction_model_cut_off == 0:
                 print("Discarding prediction model\n")
             else:
@@ -210,15 +210,16 @@ class GraphPartitioning:
             if self.fixed[i] == -1:
                 self.assignments[i] = -1
 
-        if not self._quiet:
-            print("WASTE\t\tCUT RATIO\tEDGES CUT\tTOTAL COMM VOLUME\tMODULARITY")
-            self._print_score()
-            self._print_assignments()
+        run_metrics = [self._print_score()]
+        self._print_assignments()
 
+        if self.verbose > 0:
             nodes_fixed = len([o for o in self.fixed if o == 1])
             print("\nFixed: {}".format(nodes_fixed))
 
             utils.print_partitions(self.G, self.assignments, self.num_partitions)
+
+        return run_metrics
 
 
     def _edge_expansion(self, G):
@@ -240,7 +241,7 @@ class GraphPartitioning:
 
 
     def batch_arrival(self):
-        if not self._quiet:
+        if self.verbose > 0:
             if self.restream_batches == 1:
                 print("One-shot assignment mode")
                 print("------------------------\n")
@@ -280,7 +281,7 @@ class GraphPartitioning:
                 # make a subgraph of all arrived nodes
                 Gsub = self.G.subgraph(self.nodes_arrived)
 
-                self._print_score(Gsub, quiet=True)
+                self._print_score(Gsub)
                 continue
 
             batch_arrived.append(a)
@@ -360,14 +361,14 @@ class GraphPartitioning:
                         self.nodes_arrived.append(n)
                     batch_arrived = []
 
-                run_metrics += [self._print_score(Gsub, quiet=True)]
+                run_metrics += [self._print_score(Gsub)]
 
         # remove nodes not fixed
         for i in range(0, len(self.assignments)):
             if self.fixed[i] == -1:
                 self.assignments[i] = -1
 
-        if not self._quiet:
+        if self.verbose > 0:
             self._print_assignments()
 
             nodes_fixed = len([o for o in self.fixed if o == 1])
@@ -389,7 +390,7 @@ class GraphPartitioning:
             return
 
         if self.use_virtual_nodes:
-            if not self._quiet:
+            if self.verbose > 0:
                 print("Remove virtual nodes")
 
                 print("\nCurrent graph:")
@@ -400,7 +401,7 @@ class GraphPartitioning:
             self.assignments = np.delete(self.assignments, self.virtual_nodes)
             self.fixed = np.delete(self.fixed, self.virtual_nodes)
 
-            if not self._quiet:
+            if self.verbose > 0:
                 print("\nVirtual nodes removed:")
                 print("Nodes: {}".format(self.G.number_of_nodes()))
                 print("Edges: {}".format(self.G.number_of_edges()))
@@ -466,7 +467,7 @@ class GraphPartitioning:
             "QovL",
         ]
 
-        if not self._quiet:
+        if self.verbose > 0:
             print("Complete graph with {} nodes".format(self.G.number_of_nodes()))
         (file_maxperm, file_oslom) = utils.write_graph_files(self.OUTPUT_DIRECTORY,
                                                              "{}-all".format(self.metrics_filename),
@@ -497,7 +498,7 @@ class GraphPartitioning:
                                                         file_oslom)
         graph_metrics.update(community_metrics)
 
-        if not self._quiet:
+        if self.verbose > 0:
             print("\nConfig")
             print("-------\n")
             for f in graph_fieldnames[:8]:
@@ -558,7 +559,7 @@ class GraphPartitioning:
 
             nodes = [i for i,x in enumerate(self.assignments) if x == p]
             Gsub = self.G.subgraph(nodes)
-            if not self._quiet:
+            if self.verbose > 0:
                 print("\nPartition {} with {} nodes".format(p, Gsub.number_of_nodes()))
                 print("-----------------------------\n")
 
@@ -586,7 +587,7 @@ class GraphPartitioning:
                                                             file_oslom)
             partition_overlapping_metrics.update(community_metrics)
 
-            if not self._quiet:
+            if self.verbose > 0:
                 print("\nMetrics")
                 for f in partition_overlapping_fieldnames:
                     print("{}: {}".format(f, partition_overlapping_metrics[f]))
