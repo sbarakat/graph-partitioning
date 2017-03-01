@@ -210,7 +210,7 @@ class GraphPartitioning:
                 self.assignments[i] = -1
 
         if not self._quiet:
-            print("WASTE\t\tCUT RATIO\tEDGES CUT\tTOTAL COMM VOLUME")
+            print("WASTE\t\tCUT RATIO\tEDGES CUT\tTOTAL COMM VOLUME\tMODULARITY")
             self._print_score()
             self._print_assignments()
 
