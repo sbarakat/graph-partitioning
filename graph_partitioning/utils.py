@@ -108,7 +108,7 @@ rpy2_loaded = False
 base = None
 utils = None
 mgcv = None
-def gam_predict(population_csv, num_arrived, k_value):
+def gam_predict(location_csv, prediction_file, num_arrived, k_value):
 
     if not rpy2_loaded:
         from rpy2.robjects import Formula
@@ -116,19 +116,24 @@ def gam_predict(population_csv, num_arrived, k_value):
         base = importr('base')
         utils = importr('utils')
         mgcv = importr('mgcv')
-        filename = os.path.basename(population_csv)
+        location_filename = os.path.basename(location_csv)
+        prediction_filename = os.path.basename(prediction_file)
 
     # Setup
-    base.setwd(os.path.dirname(population_csv))
-    population = utils.read_csv(filename, header=False, nrows=num_arrived)
-    population.colnames = ["shelter","x","y"]
+    base.setwd(os.path.dirname(location_csv))
+    loc = utils.read_csv(location_filename, header=False, nrows=num_arrived)
+    pred = utils.read_csv(prediction_filename, header=False, nrows=num_arrived)
+    pop = base.cbind(pred, loc)
+    pop.colnames = ["shelter","x","y"]
 
     # GAM
     formula = Formula('shelter~s(x,y,k={})'.format(k_value))
-    m = mgcv.gam(formula, family="binomial", method="REML", data=population)
+    m = mgcv.gam(formula, family="binomial", method="REML", data=pop)
 
     # Predict for everyone
-    newd = utils.read_csv(filename, header=False)
+    loc = utils.read_csv(location_filename, header=False)
+    pred = utils.read_csv(prediction_filename, header=False)
+    newd = base.cbind(pred, loc)
     newd.colnames = ["shelter","x","y"]
     result = mgcv.predict_gam(m, newd, type="response", se_fit=False)
 
@@ -209,20 +214,68 @@ def base_metrics(G, assignments=None):
 
     return (edges_cut, steps, mod)
 
-def modularity(G):
-    part = dict([(n[0], int(n[1]['partition'])) for n in G.nodes(data=True)])
+def modularity(G, best_partition=False):
+    if best_partition:
+        part = community.best_partition(G)
+    else:
+        part = dict([(n[0], int(n[1]['partition'])) for n in G.nodes(data=True)])
     mod = community.modularity(part, G)
     return mod
 
 
-def run_max_perm(edges_maxperm_filename):
+def loneliness_score(G, loneliness_score_param):
+    total = 0
+    count = 0
+    for n in G.nodes():
+        node_edges = len(G[n])
+        score = 1 - ((1 / (node_edges + 1)**loneliness_score_param))
+        total += score
+        count += 1
+
+    # average for partition
+    return total / count
+
+def complete_loneliness_score(G, loneliness_score_param, assignments, num_partitions):
+    """
+    Return a weighted average across all partitions for loneliness score
+    """
+    p = get_partition_population(G, assignments, num_partitions)
+    partition_population = [p[x][0] for x in p]
+    partition_score = list(range(0, num_partitions))
+
+    for p in range(0, num_partitions):
+        nodes = [i for i,x in enumerate(assignments) if x == p]
+        Gsub = G.subgraph(nodes)
+        partition_score[p] = loneliness_score(Gsub, loneliness_score_param)
+
+    return np.average(partition_score, weights=partition_population)
+
+
+def run_max_perm(G, relabel_nodes=False):
     max_perm = 0.0
     temp_dir = tempfile.mkdtemp()
-    with open(edges_maxperm_filename, "r") as edge_file:
+    edges_filename = os.path.join(temp_dir, "edges-maxperm.txt")
+
+    # MaxPerm requires nodes in sequential order
+    if relabel_nodes:
+        mapping = dict(zip(G.nodes(), range(0, len(G.nodes()))))
+        nx.relabel_nodes(G, mapping, copy=False)
+
+    # write edge list in a format for MaxPerm, tab delimited
+    with open(edges_filename, "w") as outf:
+        outf.write("{}\t{}\n".format(G.number_of_nodes(), G.number_of_edges()))
+        for e in sorted(G.edges_iter()):
+            outf.write("{}\t{}\n".format(*e))
+
+    # cat edge list into MaxPerm bin
+    with open(edges_filename, "r") as edge_file:
         args = [os.path.join(BIN_DIRECTORY, "MaxPerm", "MaxPerm")]
-        retval = subprocess.call(
-            args, cwd=temp_dir, stdin=edge_file,
-            stderr=subprocess.STDOUT)
+        with open(os.devnull, "w") as devnull:
+            retval = subprocess.call(
+                args, cwd=temp_dir, stdin=edge_file,
+                stdout=devnull)
+
+    # parse the output file to get the permanence metric
     with open(os.path.join(temp_dir, "output.txt"), "r") as fp:
         for i, line in enumerate(fp):
             if "Network Permanence" in line:
@@ -230,6 +283,7 @@ def run_max_perm(edges_maxperm_filename):
                 break
     shutil.rmtree(temp_dir)
     return max_perm
+
 
 def run_community_metrics(output_path, data_filename, edges_oslom_filename):
     """
@@ -241,8 +295,8 @@ def run_community_metrics(output_path, data_filename, edges_oslom_filename):
     """
     temp_dir = tempfile.mkdtemp()
     oslom_bin = os.path.join(BIN_DIRECTORY, "OSLOM2", "oslom_dir")
-    oslom_log = os.path.join(output_path, data_filename + "-oslom.log")
-    oslom_modules = os.path.join(output_path, data_filename + "-oslom-tp.txt")
+    oslom_log = os.path.join(output_path, 'oslom', data_filename + "-oslom.log")
+    oslom_modules = os.path.join(output_path, 'oslom', data_filename + "-oslom-tp.txt")
     args = [oslom_bin, "-f", edges_oslom_filename, "-w", "-r", "10", "-hr", "50"]
     with open(oslom_log, "w") as logwriter:
         retval = subprocess.call(
@@ -252,7 +306,7 @@ def run_community_metrics(output_path, data_filename, edges_oslom_filename):
     shutil.rmtree(temp_dir)
 
     com_qual_path = os.path.join(BIN_DIRECTORY, "ComQualityMetric")
-    com_qual_log = os.path.join(output_path, data_filename + "-CommunityQuality.log")
+    com_qual_log = os.path.join(output_path, 'oslom', data_filename + "-CommunityQuality.log")
     args = ["java", "OverlappingCommunityQuality", "-weighted", edges_oslom_filename, oslom_modules]
     with open(com_qual_log, "w") as logwriter:
         retval = subprocess.call(
@@ -310,63 +364,38 @@ def fixed_width_print(arr):
             print(" ", end='')
     print("]")
 
-def line_print(assignments):
-    for i in range(0, len(assignments)):
-        for b in range(i, len(assignments)):
-            if assignments[b] != -1:
-                break
-        if b != len(assignments)-1:
-            print("{} ".format(assignments[i]), end='')
-    print()
-
-# write to file
-def write_to_file(filename, assignments):
-    with open(filename, "w") as f:
-        j = 0
-        for a in assignments:
-            f.write("{} {}\n".format(j,a))
-            j += 1
 
 def write_graph_files(output_path, data_filename, G, quiet=False, relabel_nodes=False):
 
     if not os.path.exists(output_path):
         os.makedirs(output_path)
+    if not os.path.exists(os.path.join(output_path, 'oslom')):
+        os.makedirs(os.path.join(output_path, 'oslom'))
+    if not os.path.exists(os.path.join(output_path, 'graphs')):
+        os.makedirs(os.path.join(output_path, 'graphs'))
 
     # write to GML file
-    gml_filename = os.path.join(output_path, data_filename + "-graph.gml")
+    gml_filename = os.path.join(output_path, 'graphs', data_filename + "-graph.gml")
     nx.write_gml(G, gml_filename)
 
     # write assignments into a file with a single column
-    assignments_filename = os.path.join(output_path, data_filename + "-assignments.txt")
+    assignments_filename = os.path.join(output_path, 'graphs', data_filename + "-assignments.txt")
     with open(assignments_filename, "w") as outf:
         for n in G.nodes_iter(data=True):
             outf.write("{}\n".format(n[1]["partition"]))
 
     # write edge list in a format for OSLOM, tab delimited
-    edges_oslom_filename = os.path.join(output_path, data_filename + "-edges-oslom.txt")
+    edges_oslom_filename = os.path.join(output_path, 'oslom', data_filename + "-edges-oslom.txt")
     with open(edges_oslom_filename, "w") as outf:
         for e in G.edges_iter(data=True):
             outf.write("{}\t{}\t{}\n".format(e[0], e[1], e[2]["weight"]))
 
-    # MaxPerm requires nodes in sequential order
-    if relabel_nodes:
-        mapping = dict(zip(G.nodes(), range(0, len(G.nodes()))))
-        nx.relabel_nodes(G, mapping, copy=False)
-
-    # write edge list in a format for MaxPerm, tab delimited
-    edges_maxperm_filename = os.path.join(output_path, data_filename + "-edges-maxperm.txt")
-    with open(edges_maxperm_filename, "w") as outf:
-        outf.write("{}\t{}\n".format(G.number_of_nodes(), G.number_of_edges()))
-        for e in sorted(G.edges_iter()):
-            outf.write("{}\t{}\n".format(*e))
-
     if not quiet:
         print("Writing GML file: {}".format(gml_filename))
         print("Writing assignments: {}".format(assignments_filename))
-        print("Writing edge list (for MaxPerm): {}".format(edges_maxperm_filename))
         print("Writing edge list (for OSLOM): {}".format(edges_oslom_filename))
 
-    return (edges_maxperm_filename, edges_oslom_filename)
+    return edges_oslom_filename
 
 def write_metrics_csv(filename, fields, metrics):
     if not os.path.exists(filename):
@@ -377,36 +406,3 @@ def write_metrics_csv(filename, fields, metrics):
         csv_writer = csv.DictWriter(outf, fieldnames=fields)
         csv_writer.writerow(metrics)
 
-
-def squash_partition(graph, partition_nodes, part, assignments):
-
-    H = graph.copy()
-    H.add_nodes_from(partition_nodes, weight=1)
-
-    del_nodes = []
-    add_edges = []
-    for n in H.edges_iter(data=True):
-        left = n[0]
-        right = n[1]
-        if assignments[left] == part and assignments[right] == part:
-            continue
-
-        elif assignments[left] == part and assignments[right] != part:
-            del_nodes += [right]
-            add_edges += [[left, partition_nodes[assignments[right]]]]
-
-        elif assignments[left] != part and assignments[right] == part:
-            del_nodes += [left]
-            add_edges += [[right, partition_nodes[assignments[left]]]]
-
-        elif assignments[left] != part and assignments[right] != part:
-            del_nodes += [left]
-            del_nodes += [right]
-
-    for d in list(set(del_nodes)):
-        H.remove_node(d)
-    for a in add_edges:
-        H.add_edge(a[0], a[1])
-    H.remove_node(partition_nodes[part])
-
-    return H
