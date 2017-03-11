@@ -175,8 +175,10 @@ class GraphPartitioning:
             graph = self.G
 
         x = utils.score(graph, self.assignments, self.num_partitions)
-        edges_cut, steps, mod = utils.base_metrics(graph, self.assignments)
-        loneliness = utils.complete_loneliness_score(self.G, self.loneliness_score_param, self.assignments, self.num_partitions)
+        edges_cut, steps = utils.base_metrics(graph, self.assignments)
+
+        mod = utils.modularity_wavg(graph, self.assignments, self.num_partitions)
+        loneliness = utils.loneliness_score_wavg(self.G, self.loneliness_score_param, self.assignments, self.num_partitions)
         max_perm = utils.run_max_perm(self.G)
 
         if self.verbose > 1:
@@ -577,7 +579,7 @@ class GraphPartitioning:
             partition_nonoverlapping_metrics.update({"network_permanence": max_perm})
 
             # Modularity
-            mod = utils.modularity(Gsub, True)
+            mod = utils.modularity(Gsub, best_partition=True)
             partition_nonoverlapping_metrics.update({"modularity": mod})
 
             # Loneliness Score
