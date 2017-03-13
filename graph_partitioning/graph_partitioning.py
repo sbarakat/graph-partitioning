@@ -120,7 +120,8 @@ class GraphPartitioning:
                 self.assignments = np.fromiter(inf.readlines(), dtype=np.int32)
 
         else:
-            self.G = self._edge_expansion(self.G)
+            if self.graph_modification_functions:
+                self.G = self._edge_expansion(self.G)
             self.assignments = self.prediction_model_algorithm.generate_prediction_model(self.G, self.num_iterations, self.num_partitions, self.assignments, self.fixed)
 
         if self.verbose > 0:
