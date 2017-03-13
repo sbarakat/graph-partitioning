@@ -488,7 +488,7 @@ class GraphPartitioning:
         })
 
         # edges cut and communication volume
-        edges_cut, steps, mod = utils.base_metrics(self.G, self.assignments)
+        edges_cut, steps = utils.base_metrics(self.G, self.assignments)
         graph_metrics.update({
             "edges_cut": edges_cut,
             "total_communication_volume": steps,
