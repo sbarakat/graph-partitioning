@@ -158,7 +158,7 @@ class GraphPartitioning:
         self.assignments = np.append(self.assignments, np.array(list(range(0, self.num_partitions)), dtype=np.int32))
         self.fixed = np.append(self.fixed, np.array([1] * self.num_partitions, dtype=np.int32))
 
-        self.G.add_nodes_from(self.virtual_nodes, weight=1)
+        self.G.add_nodes_from(self.virtual_nodes, weight=1.0)
         self.G.add_edges_from(self.virtual_edges, weight=self.virtual_edge_weight)
 
         if self.verbose > 0:
@@ -203,7 +203,7 @@ class GraphPartitioning:
                 continue
 
             # set 100% node weight for those that need a shelter
-            if self.alter_arrived_node_weight_to_100:
+            if self.graph_modification_functions and self.alter_arrived_node_weight_to_100:
                 self.G.node[a]['weight'] = 100
 
             nodes_fixed = len([o for o in self.fixed if o == 1])
