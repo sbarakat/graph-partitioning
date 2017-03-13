@@ -179,8 +179,8 @@ class GraphPartitioning:
         edges_cut, steps = utils.base_metrics(graph, self.assignments)
 
         mod = utils.modularity_wavg(graph, self.assignments, self.num_partitions)
-        loneliness = utils.loneliness_score_wavg(self.G, self.loneliness_score_param, self.assignments, self.num_partitions)
-        max_perm = utils.run_max_perm(self.G)
+        loneliness = utils.loneliness_score_wavg(graph, self.loneliness_score_param, self.assignments, self.num_partitions)
+        max_perm = utils.run_max_perm(graph)
 
         if self.verbose > 1:
             print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4}\t{5}\t{6}".format(x[0], x[1], edges_cut, steps, mod, loneliness, max_perm))
