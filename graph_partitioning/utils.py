@@ -207,21 +207,33 @@ def base_metrics(G, assignments=None):
                 steps += 1
                 partition_seen.append(right_partition)
 
-    mod = None
-    if not assignments is None:
-        part = dict(zip(G.nodes(), assignments))
-        mod = community.modularity(part, G)
+    return (edges_cut, steps)
 
-    return (edges_cut, steps, mod)
-
-def modularity(G, best_partition=False):
+def modularity(G, assignments=None, best_partition=False):
     if best_partition:
         part = community.best_partition(G)
+    elif assignments:
+        part = dict(zip(G.nodes(), assignments))
     else:
+        # get assignments from Graph
         part = dict([(n[0], int(n[1]['partition'])) for n in G.nodes(data=True)])
     mod = community.modularity(part, G)
     return mod
 
+def modularity_wavg(G, assignments, num_partitions):
+    """
+    Return a weighted average across all partitions for modularity score
+    """
+    p = get_partition_population(G, assignments, num_partitions)
+    partition_population = [p[x][0] for x in p]
+    partition_score = list(range(0, num_partitions))
+
+    for p in range(0, num_partitions):
+        nodes = [i for i,x in enumerate(assignments) if x == p]
+        Gsub = G.subgraph(nodes)
+        partition_score[p] = modularity(Gsub, best_partition=True)
+
+    return np.average(partition_score, weights=partition_population)
 
 def loneliness_score(G, loneliness_score_param):
     total = 0
@@ -235,7 +247,7 @@ def loneliness_score(G, loneliness_score_param):
     # average for partition
     return total / count
 
-def complete_loneliness_score(G, loneliness_score_param, assignments, num_partitions):
+def loneliness_score_wavg(G, loneliness_score_param, assignments, num_partitions):
     """
     Return a weighted average across all partitions for loneliness score
     """

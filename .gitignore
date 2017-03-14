@@ -10,3 +10,4 @@ output/
 PaToH.log.*
 
 config.py
+data/PaToH.log.*
