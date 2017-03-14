@@ -246,7 +246,6 @@ class GraphPartitioning:
         return G
 
 
-
     def batch_arrival(self):
         if self.verbose > 0:
             if self.restream_batches == 1:
@@ -258,7 +257,6 @@ class GraphPartitioning:
 
         batch_arrived = []
         run_metrics = []
-        #print("WASTE\t\tCUT RATIO\tEDGES CUT\tTOTAL COMM VOLUME\tMODULARITY")
         for i, a in enumerate(self.arrival_order):
 
             # check if node is already arrived
@@ -293,82 +291,13 @@ class GraphPartitioning:
 
             batch_arrived.append(a)
 
-            # batch processing and process remaining nodes on final iteration
-            if self.restream_batches == len(batch_arrived) or i == len(self.arrival_order) - 1:
+            # batch processing
+            if self.restream_batches == len(batch_arrived):
+                run_metrics += self.process_batch(batch_arrived)
+                batch_arrived = []
 
-                # GRAPH MODIFICATION FUNCTIONS
-                if self.graph_modification_functions:
-
-                    # set node weight to prediction generated from a GAM
-                    if self.alter_node_weight_to_gam_prediction:
-                        total_arrived = self.nodes_arrived + batch_arrived + [a]
-                        if len(total_arrived) < self.gam_k_value:
-                            k = len(total_arrived)
-                        else:
-                            k = self.gam_k_value
-
-                        gam_weights = utils.gam_predict(self.POPULATION_LOCATION_FILE,
-                                                        self.PREDICTION_LIST_FILE,
-                                                        len(total_arrived),
-                                                        k)
-
-                        for node in self.G.nodes_iter():
-                            if self.alter_arrived_node_weight_to_100 and node in total_arrived:
-                                pass # weight would have been set previously
-                            else:
-                                self.G.node[node]['weight'] = int(gam_weights[node] * 100)
-
-                    self.G = self._edge_expansion(self.G)
-
-                # make a subgraph of all arrived nodes
-                Gsub = self.G.subgraph(self.nodes_arrived + batch_arrived)
-
-                # recalculate alpha
-                if Gsub.is_directed():
-                    # as it's a directed graph, edges_arrived is actually double, so divide by 2
-                    edges_arrived = Gsub.number_of_edges() / 2
-                else:
-                    edges_arrived = Gsub.number_of_edges()
-
-                if self.PARTITIONER_ALGORITHM == 'FENNEL':
-                    nodes_fixed = len([o for o in self.fixed if o == 1])
-                    alpha = (edges_arrived) * (self.num_partitions / (nodes_fixed + len(batch_arrived))**2)
-                    self.partition_algorithm.PREDICTION_MODEL_ALPHA = alpha
-
-                if self.alter_node_weight_to_gam_prediction:
-                    # justification: the gam learns the entire population, so run fennal on entire population
-                    self.assignments = self.partition_algorithm.generate_prediction_model(self.G,
-                                                                        self.num_iterations,
-                                                                        self.num_partitions,
-                                                                        self.assignments,
-                                                                        self.fixed)
-                else:
-                    # use the information we have, those that arrived
-                    self.assignments = self.partition_algorithm.generate_prediction_model(Gsub,
-                                                                        self.num_iterations,
-                                                                        self.num_partitions,
-                                                                        self.assignments,
-                                                                        self.fixed)
-
-                if self.sliding_window:
-                    n = batch_arrived.pop(0)
-                    self.fixed[n] = 1
-                    self.nodes_arrived.append(n)
-
-                    # final batch, assign all remaining nodes
-                    if i == len(self.arrival_order) - 1:
-                        for n in batch_arrived:
-                            self.fixed[n] = 1
-                            self.nodes_arrived.append(n)
-
-                else:
-                    # assign nodes to prediction model
-                    for n in batch_arrived:
-                        self.fixed[n] = 1
-                        self.nodes_arrived.append(n)
-                    batch_arrived = []
-
-                run_metrics += [self._print_score(Gsub)]
+        # process remaining nodes in incomplete batch
+        run_metrics += self.process_batch(batch_arrived, assign_all=True)
 
         # remove nodes not fixed
         for i in range(0, len(self.assignments)):
@@ -384,6 +313,76 @@ class GraphPartitioning:
             utils.print_partitions(self.G, self.assignments, self.num_partitions)
 
         return run_metrics
+
+
+    def process_batch(self, batch_arrived, assign_all=False):
+
+        # GRAPH MODIFICATION FUNCTIONS
+        if self.graph_modification_functions:
+
+            # set node weight to prediction generated from a GAM
+            if self.alter_node_weight_to_gam_prediction:
+                total_arrived = self.nodes_arrived + batch_arrived
+                if len(total_arrived) < self.gam_k_value:
+                    k = len(total_arrived)
+                else:
+                    k = self.gam_k_value
+
+                gam_weights = utils.gam_predict(self.POPULATION_LOCATION_FILE,
+                                                self.PREDICTION_LIST_FILE,
+                                                len(total_arrived),
+                                                k)
+
+                for node in self.G.nodes_iter():
+                    if self.alter_arrived_node_weight_to_100 and node in total_arrived:
+                        pass # weight would have been set previously
+                    else:
+                        self.G.node[node]['weight'] = int(gam_weights[node] * 100)
+
+            self.G = self._edge_expansion(self.G)
+
+        # make a subgraph of all arrived nodes
+        Gsub = self.G.subgraph(self.nodes_arrived + batch_arrived)
+
+        # recalculate alpha
+        if Gsub.is_directed():
+            # as it's a directed graph, edges_arrived is actually double, so divide by 2
+            edges_arrived = Gsub.number_of_edges() / 2
+        else:
+            edges_arrived = Gsub.number_of_edges()
+
+        if self.PARTITIONER_ALGORITHM == 'FENNEL':
+            nodes_fixed = len([o for o in self.fixed if o == 1])
+            alpha = (edges_arrived) * (self.num_partitions / (nodes_fixed + len(batch_arrived))**2)
+            self.partition_algorithm.PREDICTION_MODEL_ALPHA = alpha
+
+        if self.alter_node_weight_to_gam_prediction:
+            # justification: the gam learns the entire population, so run fennal on entire population
+            self.assignments = self.partition_algorithm.generate_prediction_model(self.G,
+                                                                self.num_iterations,
+                                                                self.num_partitions,
+                                                                self.assignments,
+                                                                self.fixed)
+        else:
+            # use the information we have, those that arrived
+            self.assignments = self.partition_algorithm.generate_prediction_model(Gsub,
+                                                                self.num_iterations,
+                                                                self.num_partitions,
+                                                                self.assignments,
+                                                                self.fixed)
+
+        if self.sliding_window and not assign_all:
+            n = batch_arrived.pop(0)
+            self.fixed[n] = 1
+            self.nodes_arrived.append(n)
+
+        else:
+            # assign nodes to prediction model
+            for n in batch_arrived:
+                self.fixed[n] = 1
+                self.nodes_arrived.append(n)
+
+        return [self._print_score(Gsub)]
 
 
     def get_metrics(self):
