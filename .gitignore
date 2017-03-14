@@ -8,3 +8,4 @@ output/
 *.class
 
 config.py
+data/PaToH.log.*
