@@ -275,6 +275,10 @@ class GraphPartitioning:
                 if self.alter_arrived_node_weight_to_100:
                     self.G.node[a]['weight'] = 100
 
+            # skip nodes that don't need a shelter
+            if self.simulated_arrival_list[a] == 0:
+                continue
+
             # one-shot assigment: assign each node as it arrives
             if self.restream_batches == 1:
                 alpha = self.one_shot_alpha
@@ -372,12 +376,13 @@ class GraphPartitioning:
                                                                 self.fixed)
 
         if self.sliding_window and not assign_all:
+            # assign first node
             n = batch_arrived.pop(0)
             self.fixed[n] = 1
             self.nodes_arrived.append(n)
 
         else:
-            # assign nodes to prediction model
+            # assign all nodes to prediction model
             for n in batch_arrived:
                 self.fixed[n] = 1
                 self.nodes_arrived.append(n)
