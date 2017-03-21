@@ -76,7 +76,7 @@ class PatohPartitioner():
                 iterations[edges_cut] = _assignments
 
         # return the minimum edges cut
-        minEdgesCut = graph.number_of_nodes()
+        minEdgesCut = graph.number_of_edges()
         for key in list(iterations.keys()):
             if key < minEdgesCut:
                 minEdgesCut = key
