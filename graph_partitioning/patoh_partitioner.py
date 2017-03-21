@@ -26,14 +26,17 @@ class PatohPartitioner():
                                   num_partitions,
                                   assignments,
                                   fixed):
+        # STEP 0: sort the graph nodes
+        gSortedNodes = sorted(graph.nodes())
+
         # create a mapping between the graph node ids and those used by SCOTCH
         # ensures nodes are numbered from 0...n-1
-        node_indeces = self._createGraphIndeces(graph, len(assignments))
+        node_indeces = self._createGraphIndeces(gSortedNodes, len(assignments))
         #print('node_indeces', node_indeces)
 
         # generate a new graph that only has the new nodes
         G = nx.Graph()
-        for node in graph.nodes():
+        for node in gSortedNodes:
             # set the new node index used by scotch
             G.add_node(node_indeces[node])
             try:
@@ -43,7 +46,7 @@ class PatohPartitioner():
                 pass
 
         # add the edges for each node using the new ids
-        for node in graph.nodes():
+        for node in gSortedNodes:
             newNodeID = node_indeces[node]
             for edge in graph.neighbors(node):
                 newEdgeID = node_indeces[edge]
@@ -68,7 +71,7 @@ class PatohPartitioner():
             # perform an iteration of partitioning
             _assignments = self._runPartitioning(G, num_partitions, patoh_assignments, node_indeces, assignments)
             # compute the edges cut
-            edges_cut, steps, mod = gputils.base_metrics(graph, _assignments)
+            edges_cut, steps = gputils.base_metrics(graph, _assignments)
             if edges_cut not in list(iterations.keys()):
                 iterations[edges_cut] = _assignments
 
@@ -105,7 +108,7 @@ class PatohPartitioner():
 
         # check parameters
         if self.lib.checkUserParameters(patohdata, not self._quiet) == False:
-            print('Error with PaToH parameters.')
+            print('Error with PaToH parameters, check failed.')
             return assignments
 
         # alloc
@@ -142,14 +145,14 @@ class PatohPartitioner():
                     max_cuts = cuts
             print('Ran PaToH for', self.partitioningIterations, 'iterations with min_cuts =', min_cuts, 'and max_cuts =', max_cuts, ' - picked min_cuts assignements.')
 
-    def _createGraphIndeces(self, graph, originalNodeNum):
+    def _createGraphIndeces(self, graphNodes, originalNodeNum):
         '''
             indeces[old_node_id] = new_node_id
         '''
 
         indeces = np.repeat(-1, originalNodeNum)
         nodeCount = 0
-        for node in graph.nodes():
+        for node in graphNodes:
             indeces[node] = nodeCount
             nodeCount += 1
         return indeces
