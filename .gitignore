@@ -9,3 +9,4 @@ output/
 
 config.py
 data/PaToH.log.*
+data/predition_model_tests/*
