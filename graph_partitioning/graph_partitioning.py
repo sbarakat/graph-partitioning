@@ -299,33 +299,10 @@ class GraphPartitioning:
 
             batch_arrived.append(a)
 
-            # batch processing and process remaining nodes on final iteration
-            if self.restream_batches == len(batch_arrived) or i == len(self.arrival_order) - 1:
-                # GRAPH MODIFICATION FUNCTIONS
-                if self.graph_modification_functions:
-
-                    # set node weight to prediction generated from a GAM
-                    if self.alter_node_weight_to_gam_prediction:
-                        total_arrived = self.nodes_arrived + batch_arrived + [a]
-                        if len(total_arrived) < self.gam_k_value:
-                            k = len(total_arrived)
-                        else:
-                            k = self.gam_k_value
-
-                        gam_weights = utils.gam_predict(self.POPULATION_LOCATION_FILE,
-                                                        self.PREDICTION_LIST_FILE,
-                                                        len(total_arrived),
-                                                        k)
-
-                        for node in self.G.nodes_iter():
-                            if self.alter_arrived_node_weight_to_100 and node in total_arrived:
-                                pass # weight would have been set previously
-                            else:
-                                self.G.node[node]['weight'] = int(gam_weights[node] * 100)
             # batch processing
-            #if self.restream_batches == len(batch_arrived):
-            #    run_metrics += self.process_batch(batch_arrived)
-            #    batch_arrived = []
+            if self.restream_batches == len(batch_arrived):
+                run_metrics += self.process_batch(batch_arrived)
+                batch_arrived = []
 
         # process remaining nodes in incomplete batch
         run_metrics += self.process_batch(batch_arrived, assign_all=True)

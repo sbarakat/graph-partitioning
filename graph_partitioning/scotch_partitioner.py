@@ -14,57 +14,23 @@ class ScotchPartitioner():
         self.SCOTCH_LIB_PATH = lib_path
         self.virtualNodesEnabled = virtualNodesEnabled
 
-    def _generate_prediction_model(self,
-                                  graph,
-                                  num_iterations,
-                                  num_partitions,
-                                  assignments,
-                                  fixed):
-        # Simple version not using graph map fixed.
-
-        # SCOTCH algorithm
-
-        # STEP 1: load the graph into the SCOTCH array format
-        scotchArrays = sdata.ScotchData()
-        scotchArrays.fromNetworkxGraph(graph, baseval=0)
-
-        #scotchArrays.debugPrint()
-
-        # create instance of SCOTCH
-        mapper = scotch.Scotch(self.SCOTCH_LIB_PATH)
-        #mapper = GraphMapper(self.SCOTCH_LIB_PATH)
-
-        # set mapper parameters
-        mapper.kbalval = 0.1
-        mapper.numPartitions = num_partitions
-
-        ok = mapper.initialize(scotchArrays, verbose=False)
-        if ok:
-            # we can proceed with graphMap
-            ok = mapper.graphMap()
-            if ok:
-                return mapper.scotchData._parttab
-
-            else:
-                print('Error while running graphMap()')
-        else:
-            print('Error while setting up SCOTCH for partitioning.')
-
     def generate_prediction_model(self,
                                   graph,
                                   num_iterations,
                                   num_partitions,
                                   assignments,
                                   fixed):
+        # STEP 0: sort the graph nodes
+        gSortedNodes = sorted(graph.nodes())
 
         # STEP 1: map between graph nodes and SCOTCH nodes
         # create a mapping between the graph node ids and those used by SCOTCH
         # ensures that nodes are numbered from 0...n-1 for SCOTCH especially when some nodes in graph have been fixed
-        node_indeces = self._createGraphIndeces(graph, len(assignments))
+        node_indeces = self._createGraphIndeces(gSortedNodes, len(assignments))
 
         # generate a new graph that only has the new nodes
         G = nx.Graph()
-        for node in graph.nodes():
+        for node in gSortedNodes:
             # set the new node index used by scotch
             G.add_node(node_indeces[node])
             try:
@@ -83,7 +49,7 @@ class ScotchPartitioner():
 
         # STEP 3: add edges & weights using the new ID mapping
         # add the edges for each node using the new ids
-        for node in graph.nodes():
+        for node in gSortedNodes:
             newNodeID = node_indeces[node]
             for edge in graph.neighbors(node):
                 newEdgeID = node_indeces[edge]
@@ -149,13 +115,13 @@ class ScotchPartitioner():
         else:
             print('Error while setting up SCOTCH for partitioning.')
 
-    def _createGraphIndeces(self, graph, originalNodeNum):
+    def _createGraphIndeces(self, graphNodes, originalNodeNum):
         '''
             indeces[old_node_id] = new_node_id
         '''
         indeces = np.repeat(-1, originalNodeNum)
         nodeCount = 0
-        for node in graph.nodes():
+        for node in graphNodes:
             indeces[node] = nodeCount
             nodeCount += 1
         return indeces
