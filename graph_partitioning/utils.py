@@ -234,7 +234,7 @@ def modularity_wavg(G, assignments, num_partitions):
         #Gsub = G.subgraph(nodes)
         #partition_score[p] = modularity(Gsub, best_partition=True)
         # modularity crashes in the community package if Gsub has no nodes
-        if len(nodes) > 0:
+        if len(nodes) > 1:
             Gsub = G.subgraph(nodes)
             partition_score[p] = modularity(Gsub, best_partition=True)
         else:
