@@ -116,11 +116,12 @@ def gam_predict(location_csv, prediction_file, num_arrived, k_value):
         base = importr('base')
         utils = importr('utils')
         mgcv = importr('mgcv')
-        location_filename = os.path.basename(location_csv)
-        prediction_filename = os.path.basename(prediction_file)
+
+    location_filename = location_csv #os.path.basename(location_csv)
+    prediction_filename = prediction_file #os.path.basename(prediction_file)
 
     # Setup
-    base.setwd(os.path.dirname(location_csv))
+    #base.setwd(os.path.dirname(location_csv))
     loc = utils.read_csv(location_filename, header=False, nrows=num_arrived)
     pred = utils.read_csv(prediction_filename, header=False, nrows=num_arrived)
     pop = base.cbind(pred, loc)
