@@ -248,12 +248,8 @@ class GraphPartitioning:
 
     def batch_arrival(self):
         if self.verbose > 0:
-            if self.restream_batches == 1:
-                print("One-shot assignment mode")
-                print("------------------------\n")
-            else:
-                print("Assigning in batches of {}".format(self.restream_batches))
-                print("--------------------------------\n")
+            print("Assigning in batches of {}".format(self.restream_batches))
+            print("--------------------------------\n")
 
         batch_arrived = []
         run_metrics = []
@@ -277,20 +273,6 @@ class GraphPartitioning:
 
             # skip nodes that don't need a shelter
             if self.simulated_arrival_list[a] == 0:
-                continue
-
-            # one-shot assigment: assign each node as it arrives
-            if self.restream_batches == 1:
-                alpha = self.one_shot_alpha
-                partition_votes = fennel.get_votes(self.G, a, self.num_partitions, self.assignments)
-                assignments[a] = fennel.get_assignment(G, a, self.num_partitions, self.assignments, self.partition_votes, alpha, 0)
-                self.fixed[a] = 1
-                self.nodes_arrived.append(a)
-
-                # make a subgraph of all arrived nodes
-                Gsub = self.G.subgraph(self.nodes_arrived)
-
-                self._print_score(Gsub)
                 continue
 
             batch_arrived.append(a)
@@ -445,7 +427,6 @@ class GraphPartitioning:
             "num_partitions": self.num_partitions,
             "num_iterations": self.num_iterations,
             "prediction_model_cut_off": self.prediction_model_cut_off,
-            "one_shot_alpha": self.one_shot_alpha,
             "restream_batches": self.restream_batches,
             "use_virtual_nodes": self.use_virtual_nodes,
             "virtual_edge_weight": self.virtual_edge_weight,
@@ -455,7 +436,6 @@ class GraphPartitioning:
             "num_partitions",
             "num_iterations",
             "prediction_model_cut_off",
-            "one_shot_alpha",
             "restream_batches",
             "use_virtual_nodes",
             "virtual_edge_weight",
