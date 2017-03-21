@@ -231,8 +231,14 @@ def modularity_wavg(G, assignments, num_partitions):
 
     for p in range(0, num_partitions):
         nodes = [i for i,x in enumerate(assignments) if x == p]
-        Gsub = G.subgraph(nodes)
-        partition_score[p] = modularity(Gsub, best_partition=True)
+        #Gsub = G.subgraph(nodes)
+        #partition_score[p] = modularity(Gsub, best_partition=True)
+        # modularity crashes in the community package if Gsub has no nodes
+        if len(nodes) > 0:
+            Gsub = G.subgraph(nodes)
+            partition_score[p] = modularity(Gsub, best_partition=True)
+        else:
+            partition_score[p] = 1.0
 
     return np.average(partition_score, weights=partition_population)
 
@@ -246,6 +252,8 @@ def loneliness_score(G, loneliness_score_param):
         count += 1
 
     # average for partition
+    if count == 0:
+        return 0.0
     return total / count
 
 def loneliness_score_wavg(G, loneliness_score_param, assignments, num_partitions):
@@ -430,4 +438,3 @@ def get_cmap(N):
     def map_index_to_rgb_color(index):
         return scalar_map.to_rgba(index)
     return map_index_to_rgb_color
-
