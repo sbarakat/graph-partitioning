@@ -302,7 +302,8 @@ class GraphPartitioning:
             # batch processing
             if self.restream_batches == len(batch_arrived):
                 run_metrics += self.process_batch(batch_arrived)
-                batch_arrived = []
+                if not self.sliding_window:
+                    batch_arrived = []
 
         # process remaining nodes in incomplete batch
         run_metrics += self.process_batch(batch_arrived, assign_all=True)
