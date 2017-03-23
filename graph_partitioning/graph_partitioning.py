@@ -7,6 +7,9 @@ from builtins import ImportError
 
 from graph_partitioning import utils
 
+#import graph_partitioning.metrics.dct_metrics as nmi_metrics
+from sklearn.metrics.cluster import normalized_mutual_info_score
+
 class NoPartitionerException(Exception):
     """
     Raised when no partitioner has been specified.
@@ -129,6 +132,7 @@ class GraphPartitioning:
     def reset(self):
 
         self.assignments = np.repeat(np.int32(self.UNMAPPED), self.G.number_of_nodes())
+        self.assignments_prediction_model = np.repeat(np.int32(self.UNMAPPED), self.G.number_of_nodes())
         self.fixed = np.repeat(np.int32(self.UNMAPPED), self.G.number_of_nodes())
         self.nodes_arrived = []
         self.virtual_nodes = []
@@ -145,6 +149,7 @@ class GraphPartitioning:
             if self.graph_modification_functions:
                 self.G = self._edge_expansion(self.G)
             self.assignments = self.prediction_model_algorithm.generate_prediction_model(self.G, self.num_iterations, self.num_partitions, self.assignments, self.fixed)
+            self.assignments_prediction_model = np.array(self.assignments, copy=True)
 
         if self.verbose > 0:
             print("PREDICTION MODEL")
@@ -204,10 +209,12 @@ class GraphPartitioning:
         loneliness = utils.loneliness_score_wavg(graph, self.loneliness_score_param, self.assignments, self.num_partitions)
         max_perm = utils.run_max_perm(graph)
 
+        #nmi_score = nmi_metrics.nmi(np.array([self.assignments_prediction_model, self.assignments]))
+        nmi_score = normalized_mutual_info_score(self.assignments_prediction_model.tolist(), self.assignments.tolist())
         if self.verbose > 1:
-            print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4}\t{5}\t{6}".format(x[0], x[1], edges_cut, steps, mod, loneliness, max_perm))
+            print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4}\t{5}\t{6}\t{7:.10f}".format(x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score))
 
-        return [x[0], x[1], edges_cut, steps, mod, loneliness, max_perm]
+        return [x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score]
 
     def assign_cut_off(self):
 
