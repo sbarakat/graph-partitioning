@@ -27,6 +27,71 @@ class PatohPartitioner():
                                   assignments,
                                   fixed):
         # STEP 0: sort the graph nodes
+        sortedNodes = sorted(graph.nodes())
+
+        # STEP 1: create a mapping of nodes for relabeling
+        nodeMapping = {}
+        for newID, nodeID in enumerate(sortedNodes):
+            nodeMapping[nodeID] = newID
+
+        # Create a new graph with the new mapping
+        G = nx.relabel_nodes(graph, nodeMapping)
+
+        # Copy over the node and edge weightings
+        for node in sortedNodes:
+            newNode = nodeMapping[node]
+            try:
+                G.node[newNode]['weight'] = graph.node[node]['weight']
+
+                for edge in graph.neighbors(node):
+                    newEdge = nodeMapping[edge]['weight']
+                    try:
+                        G[newNode][newEdge] = graph[node][edge]['weight']
+                    except Exception as err:
+                        pass
+            except Exception as err:
+                pass
+
+        # Determine assignments
+        patoh_assignments = np.full(graph.number_of_nodes(), -1)
+        for nodeID, assignment in enumerate(assignments):
+            if nodeID in nodeMapping:
+                newNodeID = nodeMapping[nodeID]
+                if fixed[nodeID] == 1:
+                    patoh_assignments[newNodeID] = assignment
+
+        #print('assignments', assignments)
+        #print('fixed', fixed)
+        #print('mapping', nodeMapping)
+        #print('patoh_assignments', patoh_assignments)
+
+        iterations = {}
+        for i in range(0, self.partitioningIterations):
+            _assignments = self._runPartitioning(G, num_partitions, patoh_assignments, nodeMapping, assignments)
+            edges_cut, steps = gputils.base_metrics(graph, _assignments)
+            if edges_cut not in list(iterations.keys()):
+                iterations[edges_cut] = _assignments
+
+        # return the minimum edges cut
+        minEdgesCut = graph.number_of_edges()
+        for key in list(iterations.keys()):
+            if key < minEdgesCut:
+                minEdgesCut = key
+
+        assignments = iterations[minEdgesCut]
+
+        self._printIterationStats(iterations)
+        del iterations
+
+        return assignments
+
+    def _generate_prediction_model(self,
+                                  graph,
+                                  num_iterations,
+                                  num_partitions,
+                                  assignments,
+                                  fixed):
+        # STEP 0: sort the graph nodes
         gSortedNodes = sorted(graph.nodes())
 
         # create a mapping between the graph node ids and those used by SCOTCH
@@ -119,10 +184,13 @@ class PatohPartitioner():
         # partition
         ok = self.lib.part(patohdata)
         if ok == True:
+            #print('partvec', patohdata._partvec)
             # make a copy of the array
             #patoh_assignments = np.array(patohdata._partvec, copy=True)
             # re-map patoh_assignments back to assignments
-            for oldNode, newNode in enumerate(node_indeces):
+            for oldNode in list(node_indeces.keys()):
+                newNode = node_indeces[oldNode]
+                #for oldNode, newNode in enumerate(node_indeces):
                 assignments[oldNode] = patohdata._partvec[newNode]
 
         # free...
