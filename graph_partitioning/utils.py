@@ -3,6 +3,7 @@ import csv
 import gzip
 import shutil
 import tempfile
+import platform
 import itertools
 import subprocess
 import community
@@ -314,22 +315,51 @@ def run_community_metrics(output_path, data_filename, edges_oslom_filename):
     http://www.oslom.org/
     https://github.com/chenmingming/ComQualityMetric
     """
-    temp_dir = tempfile.mkdtemp()
-    oslom_bin = os.path.join(BIN_DIRECTORY, "OSLOM2", "oslom_dir")
-    oslom_log = os.path.join(output_path, 'oslom', data_filename + "-oslom.log")
-    oslom_modules = os.path.join(output_path, 'oslom', data_filename + "-oslom-tp.txt")
+    temp_dir = ''
+    oslom_bin = ''
+    oslom_log = ''
+    oslom_modules = ''
+
+    if 'Linux' in platform.system():
+        temp_dir = tempfile.mkdtemp()
+        oslom_bin = os.path.join(BIN_DIRECTORY, "OSLOM2", "oslom_dir")
+        oslom_log = os.path.join(output_path, 'oslom', data_filename + "-oslom.log")
+        oslom_modules = os.path.join(output_path, 'oslom', data_filename + "-oslom-tp.txt")
+
+    elif 'Darwin' in platform.system():
+        oslom_bin = os.path.join('bin', 'OSLOM2', 'oslom_dir')
+        oslom_log = os.path.join('output', 'oslom', data_filename + "-oslom.log")
+        oslom_modules = os.path.join('output', 'oslom', data_filename + "-oslom-tp.txt")
+        edges_oslom_filename = os.path.join('output', 'oslom', data_filename + "-edges-oslom.txt")
+
     args = [oslom_bin, "-f", edges_oslom_filename, "-w", "-r", "10", "-hr", "50"]
-    with open(oslom_log, "w") as logwriter:
-        retval = subprocess.call(
-            args, cwd=temp_dir,
-            stdout=logwriter, stderr=subprocess.STDOUT)
-    shutil.copy(os.path.join(temp_dir, "tp"), oslom_modules)
-    shutil.rmtree(temp_dir)
+
+    if 'Linux' in platform.system():
+        with open(oslom_log, "w") as logwriter:
+            retval = subprocess.call(
+                args, cwd=os.path.join(output_path, 'oslom'),
+                stdout=logwriter, stderr=subprocess.STDOUT)
+        shutil.copy(os.path.join(temp_dir, "tp"), oslom_modules)
+        shutil.rmtree(temp_dir)
+    elif 'Darwin' in platform.system():
+        with open(oslom_log, "w+") as logwriter:
+            retval = subprocess.call(
+                args,
+                stdout=logwriter, stderr=subprocess.STDOUT)
+        shutil.copy("tp", oslom_modules)
+        os.remove("tp")
+        os.remove("time_seed.dat")
 
     com_qual_path = os.path.join(BIN_DIRECTORY, "ComQualityMetric")
     com_qual_log = os.path.join(output_path, 'oslom', data_filename + "-CommunityQuality.log")
-    args = ["java", "OverlappingCommunityQuality", "-weighted", edges_oslom_filename, oslom_modules]
-    with open(com_qual_log, "w") as logwriter:
+
+    args = []
+    if 'Linux' in platform.system():
+        args = ["java", "OverlappingCommunityQuality", "-weighted", edges_oslom_filename, oslom_modules]
+    elif 'Darwin'  in platform.system():
+        args = ["java", "OverlappingCommunityQuality", "-weighted", os.path.join('..', '..', edges_oslom_filename), os.path.join('..', '..',oslom_modules)]
+
+    with open(com_qual_log, "w+") as logwriter:
         retval = subprocess.call(
             args, cwd=com_qual_path,
             stdout=logwriter, stderr=subprocess.STDOUT)
