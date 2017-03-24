@@ -345,7 +345,7 @@ class GraphPartitioning:
                     k = self.gam_k_value
 
                 gam_weights = utils.gam_predict(self.POPULATION_LOCATION_FILE,
-                                                self.PREDICTION_LIST_FILE,
+                                                self.SIMULATED_ARRIVAL_FILE,
                                                 len(total_arrived),
                                                 k)
 
