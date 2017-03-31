@@ -415,6 +415,20 @@ def fixed_width_print(arr):
             print(" ", end='')
     print("]")
 
+def write_assignment_file(outfolder, filepath, assignments):
+    if not os.path.exists(outfolder):
+        os.makedirs(outfolder)
+    with open(filepath, 'w+') as outF:
+        for i, assignment in enumerate(assignments):
+            outF.write(str(i) + " " + str(assignment) + "\n")
+
+def write_partition_file(outfolder, filepath, assignments, partition):
+    if not os.path.exists(outfolder):
+        os.makedirs(outfolder)
+    with open(filepath, 'w+') as outF:
+        for i, assignment in enumerate(assignments):
+            if(assignment == partition):
+                outF.write(str(i) + " " + str(assignment) + "\n")
 
 def write_graph_files(output_path, data_filename, G, quiet=False, relabel_nodes=False):
 

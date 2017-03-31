@@ -27,6 +27,10 @@ class GraphPartitioning:
         for key in kwargs:
             setattr(self, key, kwargs[key])
 
+        if(self.verbose == 0):
+            self._quiet = True
+        self.compute_output_filenames()
+
     def load_network(self):
 
         # read METIS file
@@ -445,6 +449,13 @@ class GraphPartitioning:
         # Freeze Graph from further modification
         self.G = nx.freeze(self.G)
 
+    def compute_output_filenames(self):
+        self.metrics_run_folder = os.path.join(self.OUTPUT_DIRECTORY, datetime.datetime.now().strftime('%y_%m_%d').replace("/", ""))
+        f,_ = os.path.splitext(os.path.basename(self.DATA_FILENAME))
+        self.metrics_run_filename_prediction = self.PREDICTION_MODEL_ALGORITHM + '_' + f + '-' + datetime.datetime.now().strftime('%H%M%S')
+        self.metrics_run_filename_partitioner = self.PARTITIONER_ALGORITHM + '_' + f + '-' + datetime.datetime.now().strftime('%H%M%S')
+        self.metrics_run_file_prefix_prediction = os.path.join(self.metrics_run_folder, self.metrics_run_filename_prediction)
+        self.metrics_run_file_prefix_partitioner = os.path.join(self.metrics_run_folder, self.metrics_run_filename_partitioner)
 
     def get_graph_metrics(self):
 
