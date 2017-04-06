@@ -32,7 +32,6 @@ class GraphPartitioning:
         self.compute_output_filenames()
 
     def load_network(self):
-
         # read METIS file
         self.G = utils.read_metis(self.DATA_FILENAME)
 
@@ -48,6 +47,11 @@ class GraphPartitioning:
         else:
             with open(self.SIMULATED_ARRIVAL_FILE, "r") as ar:
                 self.simulated_arrival_list = [int(line.rstrip('\n')) for line in ar]
+
+        # count the number of people arriving in the simulation
+        self.number_simulated_arrivals = 0
+        for arrival in self.simulated_arrival_list:
+            self.number_simulated_arrivals += arrival
 
         if self.verbose > 0:
             print("Graph loaded...")
@@ -221,8 +225,10 @@ class GraphPartitioning:
         return [x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score]
 
     def assign_cut_off(self):
-
-        cut_off_value = int(self.prediction_model_cut_off * self.G.number_of_nodes())
+        # stop assignments when x% of arriving people is assinged
+        cut_off_value = int(self.prediction_model_cut_off * self.number_simulated_arrivals)
+        # @deprecated cut_off_value when x% of whole population arrives
+        #cut_off_value = int(self.prediction_model_cut_off * self.G.number_of_nodes())
         if self.verbose > 0:
             if self.prediction_model_cut_off == 0:
                 print("Discarding prediction model\n")
