@@ -40,8 +40,8 @@ class ScotchData:
         print('velotab', self.velotab)
         print('len vlbltab', len(self.vlbltab))
         print('vlbltab', self.vlbltab)
-        print('len vertweights', len(self.vertexweights))
-        print('vertweights', self.vertexweights)
+        #print('len vertweights', len(self.vertexweights))
+        #print('vertweights', self.vertexweights)
 
         print('len edgetab', len(self.edgetab))
         print('edgetab', self.edgetab)
@@ -113,7 +113,7 @@ class ScotchData:
                 self.parttab = putils.genArray(nxGraph.number_of_nodes(), -1)
 
         vtabID = 0
-        nodes = nxGraph.nodes()
+        nodes = sorted(nxGraph.nodes())
 
         vertCount = 0
         for vertexID in range(self.baseval, len(nodes) + self.baseval):
@@ -143,7 +143,7 @@ class ScotchData:
 
                 edgeWeight = 1
                 try:
-                    edgeWeight = int(nxGraph[adjustedID][edgeID]['weight'])
+                    edgeWeight = int(nxGraph.edge[adjustedID][edgeID]['weight'])
                 except Exception as e:
                     edgeWeight = 1
 

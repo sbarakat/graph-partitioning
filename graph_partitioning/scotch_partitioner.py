@@ -14,6 +14,87 @@ class ScotchPartitioner():
         self.SCOTCH_LIB_PATH = lib_path
         self.virtualNodesEnabled = virtualNodesEnabled
 
+    def _generate_prediction_model(self,
+                                  graph,
+                                  num_iterations,
+                                  num_partitions,
+                                  assignments,
+                                  fixed):
+        # STEP 0: sort the graph nodes
+        sortedNodes = sorted(graph.nodes())
+
+        # STEP 1: create a mapping of nodes for relabeling
+        nodeMapping = {}
+        for newID, nodeID in enumerate(sortedNodes):
+            # old label as key, new label as value
+            nodeMapping[nodeID] = newID
+
+        #print(nodeMapping)
+
+        # Create a new graph with the new mapping
+        G = nx.relabel_nodes(graph, nodeMapping, copy=True)
+
+        # Copy over the node and edge weightings: double check this
+        for node in sortedNodes:
+            newNode = nodeMapping[node]
+            try:
+                G.node[newNode]['weight'] = graph.node[node]['weight']
+
+                for edge in graph.neighbors(node):
+                    newEdge = nodeMapping[edge]
+                    try:
+                        G.edge[newNode][newEdge]['weight'] = graph.edge[node][edge]['weight']
+                    except Exception as err:
+                        pass
+            except Exception as err:
+                pass
+
+        # Determine assignments
+        scotch_assignments = np.full(G.number_of_nodes(), -1)
+        for nodeID, assignment in enumerate(assignments):
+            if nodeID in nodeMapping:
+                # this nodeID is part of the mapping
+                newNodeID = nodeMapping[nodeID]
+                if fixed[nodeID] == 1:
+                    scotch_assignments[newNodeID] = assignment
+
+        #print('G.nodes', G.nodes())
+        #print('scotch_assignments', scotch_assignments)
+
+        # SCOTCH algorithm
+        # Load the graph into the SCOTCH array structures
+        scotchArrays = sdata.ScotchData()
+        scotchArrays.fromNetworkxGraph(G, parttab=scotch_assignments, baseval=0)
+
+        #scotchArrays.debugPrint()
+
+        # create instance of SCOTCH Library
+        mapper = scotch.Scotch(self.SCOTCH_LIB_PATH)
+
+        # set the mapper parameters
+        mapper.kbalval = 0.01
+        mapper.numPartitions = num_partitions
+
+        ok = mapper.initialize(scotchArrays, verbose=False)
+        if ok:
+            # we can proceed with graphMap
+            print('gmf')
+            ok = mapper.graphMapFixed()
+            print('gmfend')
+            if ok:
+                scotch_assignments = mapper.scotchData._parttab
+                # update assignments
+                for oldNode in list(nodeMapping.keys()):
+                    newNode = nodeMapping[oldNode]
+                    assignments[oldNode] = scotch_assignments[newNode]
+                print('returning')
+                return assignments
+            else:
+                print('Error while running graphMap()')
+        else:
+            print('Error while setting up SCOTCH for partitioning.')
+
+
     def generate_prediction_model(self,
                                   graph,
                                   num_iterations,
@@ -76,10 +157,15 @@ class ScotchPartitioner():
                 # add node's fixed partition, if present
                 scotch_assignments.append(assignment)
 
+        #print('lenass', len(scotch_assignments), G.number_of_nodes())
+        #print('assignments', assignments)
         # add virtual nodes to assignments
         if requires_virtual:
             for i in range(0, num_partitions):
                 scotch_assignments.append(i)
+
+        #node_weights = {n[0]: n[1]['weight'] for n in G.nodes_iter(data=True)}
+        #print('scotchnw', node_weights)
 
         # SCOTCH algorithm
         # Load the graph into the SCOTCH array structures
@@ -92,23 +178,30 @@ class ScotchPartitioner():
         mapper = scotch.Scotch(self.SCOTCH_LIB_PATH)
 
         # set the mapper parameters
-        mapper.kbalval = 0.1
+        mapper.kbalval = 0.01
         mapper.numPartitions = num_partitions
 
         ok = mapper.initialize(scotchArrays, verbose=False)
         if ok:
             # we can proceed with graphMap
+            print('pre_partitioned_Ass', mapper.scotchData._parttab)
+            print('edgewhts', mapper.scotchData._edlotab)
             ok = mapper.graphMapFixed()
             if ok:
+                print('partitioned_Ass', mapper.scotchData._parttab)
                 scotch_assignments = mapper.scotchData._parttab
                 if requires_virtual:
+                    #print('requires_virtual')
                     # remove the virtual nodes from assignments
                     for virtualN in virtual_nodes:
                         G.remove_node(virtualN)
 
                 # update assignments
                 for oldNode, newNode in enumerate(node_indeces):
-                    assignments[oldNode] = scotch_assignments[newNode]
+                    if(newNode >= 0):
+                        #aold = assignments[oldNode]
+                        assignments[oldNode] = scotch_assignments[newNode]
+                        #print(oldNode, newNode, aold, scotch_assignments[newNode], assignments[oldNode])
                 return assignments
             else:
                 print('Error while running graphMap()')

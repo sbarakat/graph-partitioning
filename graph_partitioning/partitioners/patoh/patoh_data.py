@@ -118,7 +118,7 @@ class PatohData:
                         edges_added.append(edge_str)
 
                     try:
-                        eWeight = G[node][edgeID]['weight']
+                        eWeight = G.edge[node][edgeID]['weight']
                         clique_edge_weights.append(eWeight)
                     except Exception as err:
                         print('clique edge error', err)

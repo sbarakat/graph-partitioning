@@ -12,7 +12,7 @@ def isValidScotchData(data):
     return data.isValid()
 
 class Scotch:
-    def __init__(self, scotchLibPath = None, numPartitions = 10, kbalval = 0.1, strategyFlag = 1, strategyOptions = ''):
+    def __init__(self, scotchLibPath = None, numPartitions = 10, kbalval = 0.01, strategyFlag = 1, strategyOptions = ''):
         self.scotchLib = slib.LibScotch(libraryPath=scotchLibPath)
         self.scotchLib.load()
 

@@ -154,6 +154,8 @@ class GraphPartitioning:
 
 
     def prediction_model(self):
+        if self.apply_prediction_model_weights:
+            self.apply_graph_prediction_weights()
 
         if self.PREDICTION_MODEL:
             with open(self.PREDICTION_MODEL, "r") as inf:
@@ -180,6 +182,9 @@ class GraphPartitioning:
 
         if self.use_virtual_nodes:
             self.init_virtual_nodes()
+
+        if self.apply_prediction_model_weights:
+            self.remove_graph_prediction_weights()
 
         return run_metrics
 

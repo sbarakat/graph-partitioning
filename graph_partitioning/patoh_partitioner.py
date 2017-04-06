@@ -54,7 +54,7 @@ class PatohPartitioner():
                 pass
 
         # Determine assignments
-        patoh_assignments = np.full(graph.number_of_nodes(), -1)
+        patoh_assignments = np.full(G.number_of_nodes(), -1)
         for nodeID, assignment in enumerate(assignments):
             if nodeID in nodeMapping:
                 # this nodeID is part of the mapping
