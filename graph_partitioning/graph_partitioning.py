@@ -63,6 +63,13 @@ class GraphPartitioning:
 
         self.reset()
 
+        # load displacement prediction weights
+        if(self.PREDICTION_LIST_FILE == ""):
+            self.predicted_displacement_weights = [1] * self.G.number_of_nodes()
+        else:
+            with open(self.PREDICTION_LIST_FILE, 'r') as plf:
+                self.predicted_displacement_weights = [float(line.rstrip('\n')) for line in plf]
+
         # preserve original node/edge weight when modification functions are applied
         if self.graph_modification_functions:
             node_weights = {n[0]: n[1]['weight'] for n in self.G.nodes_iter(data=True)}
@@ -70,7 +77,6 @@ class GraphPartitioning:
 
             edge_weights = {(e[0], e[1]): e[2]['weight'] for e in self.G.edges_iter(data=True)}
             nx.set_edge_attributes(self.G, 'weight_orig', edge_weights)
-
 
     def init_partitioner(self):
         self.prediction_model_algorithm = None
@@ -638,3 +644,19 @@ class GraphPartitioning:
 
             csv_file = os.path.join(self.OUTPUT_DIRECTORY, "metrics-partitions-nonoverlapping.csv")
             utils.write_metrics_csv(csv_file, partition_nonoverlapping_fieldnames, partition_nonoverlapping_metrics)
+
+    def apply_graph_prediction_weights(self):
+        for i, weight in enumerate(self.predicted_displacement_weights):
+            try:
+                if(weight == 0):
+                    weight = 1.0
+                self.G.node[i]['weight'] = weight
+            except Exception as err:
+                pass
+
+    def remove_graph_prediction_weights(self):
+        for node in self.G.nodes():
+            try:
+                self.G.node[node]['weight'] = 1.0
+            except Exception as err:
+                pass
