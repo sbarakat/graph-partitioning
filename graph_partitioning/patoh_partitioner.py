@@ -32,21 +32,22 @@ class PatohPartitioner():
         # STEP 1: create a mapping of nodes for relabeling
         nodeMapping = {}
         for newID, nodeID in enumerate(sortedNodes):
+            # old label as key, new label as value
             nodeMapping[nodeID] = newID
 
         # Create a new graph with the new mapping
-        G = nx.relabel_nodes(graph, nodeMapping)
+        G = nx.relabel_nodes(graph, nodeMapping, copy=True)
 
-        # Copy over the node and edge weightings
+        # Copy over the node and edge weightings: double check this
         for node in sortedNodes:
             newNode = nodeMapping[node]
             try:
                 G.node[newNode]['weight'] = graph.node[node]['weight']
 
                 for edge in graph.neighbors(node):
-                    newEdge = nodeMapping[edge]['weight']
+                    newEdge = nodeMapping[edge]
                     try:
-                        G[newNode][newEdge] = graph[node][edge]['weight']
+                        G.edge[newNode][newEdge]['weight'] = graph.edge[node][edge]['weight']
                     except Exception as err:
                         pass
             except Exception as err:
@@ -56,6 +57,7 @@ class PatohPartitioner():
         patoh_assignments = np.full(graph.number_of_nodes(), -1)
         for nodeID, assignment in enumerate(assignments):
             if nodeID in nodeMapping:
+                # this nodeID is part of the mapping
                 newNodeID = nodeMapping[nodeID]
                 if fixed[nodeID] == 1:
                     patoh_assignments[newNodeID] = assignment

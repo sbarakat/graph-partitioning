@@ -55,8 +55,8 @@ class ScotchPartitioner():
                 newEdgeID = node_indeces[edge]
                 G.add_edge(newNodeID, newEdgeID)
                 try:
-                    weight = graph[node][edge]['weight']
-                    G[newNodeID][newEdgeID]['weight'] = weight
+                    weight = graph.edge[node][edge]['weight']
+                    G.edge[newNodeID][newEdgeID]['weight'] = weight
                 except Exception as err:
                     pass
 
