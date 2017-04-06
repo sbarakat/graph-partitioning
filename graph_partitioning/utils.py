@@ -390,6 +390,11 @@ def get_partition_population(graph, assignments, num_partitions):
         for i in range(0, len(assignments)):
             if assignments[i] >= 0:
                 nodes[assignments[i]] += 1
+                # get the node's weight
+                try:
+                    weights[assignments[i]] += graph.node[i]['weight']
+                except Exception as err:
+                    weights[assignments[i]] += 1.0
 
     for p in range(0, num_partitions):
         population[p] = (nodes[p], weights[p])
