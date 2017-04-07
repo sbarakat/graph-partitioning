@@ -178,7 +178,7 @@ class ScotchPartitioner():
         mapper = scotch.Scotch(self.SCOTCH_LIB_PATH)
 
         # set the mapper parameters
-        mapper.kbalval = 0.01
+        mapper.kbalval = 0.001
         mapper.numPartitions = num_partitions
 
         ok = mapper.initialize(scotchArrays, verbose=False)
