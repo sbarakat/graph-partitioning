@@ -154,6 +154,10 @@ class GraphPartitioning:
 
 
     def prediction_model(self):
+        if self.PREDICTION_MODEL_ALGORITHM == 'SCOTCH':
+            # update SCOTCH Strategy to 'quality' partition weights for prediction model
+            self.partition_algorithm.partitionStrategy = 'quality'
+
         if self.apply_prediction_model_weights:
             self.apply_graph_prediction_weights()
 
@@ -300,6 +304,10 @@ class GraphPartitioning:
         if self.verbose > 0:
             print("Assigning in batches of {}".format(self.restream_batches))
             print("--------------------------------\n")
+
+        if self.PARTITIONER_ALGORITHM == 'SCOTCH':
+            # update SCOTCH Strategy to 'balance' partition weights, rather than  default 'quality' strategy
+            self.partition_algorithm.partitionStrategy = 'balance'
 
         batch_arrived = []
         run_metrics = []

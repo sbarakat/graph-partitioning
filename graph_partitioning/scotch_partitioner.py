@@ -13,6 +13,7 @@ class ScotchPartitioner():
     def __init__(self, lib_path, virtualNodesEnabled = False):
         self.SCOTCH_LIB_PATH = lib_path
         self.virtualNodesEnabled = virtualNodesEnabled
+        self.partitionStrategy = 'quality'
 
     def _generate_prediction_model(self,
                                   graph,
@@ -180,7 +181,7 @@ class ScotchPartitioner():
         # set the mapper parameters
         mapper.kbalval = 0.00
         mapper.numPartitions = num_partitions
-        mapper.strategyFlag = scotch.strategyFlag('balance')
+        mapper.strategyFlag = scotch.strategyFlag(self.partitionStrategy)
 
         ok = mapper.initialize(scotchArrays, verbose=False)
         if ok:
