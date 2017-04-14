@@ -153,7 +153,12 @@ def score(graph, assignment, num_partitions=None):
     Returns: (total wasted bin space, ratio of edges cut)
     """
     if num_partitions:
-        balance = np.array(bincount_assigned(graph, assignment, num_partitions)) / len(assignment)
+        # Note: the partition counts should be divided by the number of nodes which have been partitioned
+        # rather than the size of the assignments vector
+        balance = np.array(bincount_assigned(graph, assignment, num_partitions))
+        if graph.number_of_nodes() > 0:
+            balance = balance / (graph.number_of_nodes() * 1.0)
+        #balance = np.array(bincount_assigned(graph, assignment, num_partitions)) / len(assignment)
     else:
         balance = np.bincount(assignment) / len(assignment)
     waste = (np.max(balance) - balance).sum()
