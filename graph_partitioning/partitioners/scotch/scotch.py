@@ -11,6 +11,49 @@ def isValidScotchData(data):
 
     return data.isValid()
 
+def strategyFlag(flag):
+    '''
+    #define SCOTCH_STRATDEFAULT         0x0000
+    #define SCOTCH_STRATQUALITY         0x0001
+    #define SCOTCH_STRATSPEED           0x0002
+    #define SCOTCH_STRATBALANCE         0x0004
+    #define SCOTCH_STRATSAFETY          0x0008
+    #define SCOTCH_STRATSCALABILITY     0x0010
+    #define SCOTCH_STRATRECURSIVE       0x0100
+    #define SCOTCH_STRATREMAP           0x0200
+    #define SCOTCH_STRATLEVELMAX        0x1000
+    #define SCOTCH_STRATLEVELMIN        0x2000
+    #define SCOTCH_STRATLEAFSIMPLE      0x4000
+    #define SCOTCH_STRATSEPASIMPLE      0x8000
+    '''
+    if 'default' in flag:
+        return 0;
+    elif 'quality' in flag:
+        return 1
+    elif 'speed' in flag:
+        return 2
+    elif 'balance' in flag:
+        return 4
+    elif 'safety' in flag:
+        return 8
+    elif 'scalability' in flag:
+        return 16
+    elif 'recursive' in flag:
+        return 256
+    elif 'remap' in flag:
+        return 512
+    elif 'levelmax' in flag:
+        return 4096
+    elif 'levelmin' in flag:
+        return 8192
+    elif 'leafsimple' in flag:
+        return 16384
+    elif 'sepasimple' in flag:
+        return 32768
+    else:
+        return 0
+
+
 class Scotch:
     def __init__(self, scotchLibPath = None, numPartitions = 10, kbalval = 0.01, strategyFlag = 1, strategyOptions = ''):
         self.scotchLib = slib.LibScotch(libraryPath=scotchLibPath)

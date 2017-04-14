@@ -178,17 +178,18 @@ class ScotchPartitioner():
         mapper = scotch.Scotch(self.SCOTCH_LIB_PATH)
 
         # set the mapper parameters
-        mapper.kbalval = 0.001
+        mapper.kbalval = 0.00
         mapper.numPartitions = num_partitions
+        mapper.strategyFlag = scotch.strategyFlag('balance')
 
         ok = mapper.initialize(scotchArrays, verbose=False)
         if ok:
             # we can proceed with graphMap
-            print('pre_partitioned_Ass', mapper.scotchData._parttab)
-            print('edgewhts', mapper.scotchData._edlotab)
+            #print('pre_partitioned_Ass', mapper.scotchData._parttab)
+            #print('edgewhts', mapper.scotchData._edlotab)
             ok = mapper.graphMapFixed()
             if ok:
-                print('partitioned_Ass', mapper.scotchData._parttab)
+                #print('partitioned_Ass', mapper.scotchData._parttab)
                 scotch_assignments = mapper.scotchData._parttab
                 if requires_virtual:
                     #print('requires_virtual')
