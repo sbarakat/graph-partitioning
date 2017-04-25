@@ -12,3 +12,4 @@ PaToH.log.*
 config.py
 data/PaToH.log.*
 data/predition_model_tests/*
+data/ideal_node_ordering/*
