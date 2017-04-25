@@ -227,6 +227,13 @@ def modularity(G, assignments=None, best_partition=False):
     mod = community.modularity(part, G)
     return mod
 
+def fix_G_for_modularity(G):
+    if(G.size(weight='weight') == 0):
+        for node in G.nodes():
+            for neighbor in G.neighbors(node):
+                if(G.edge[node][neighbor]['weight'] == 0):
+                    G.edge[node][neighbor]['weight'] = 1.0
+
 def modularity_wavg(G, assignments, num_partitions):
     """
     Return a weighted average across all partitions for modularity score
@@ -241,7 +248,22 @@ def modularity_wavg(G, assignments, num_partitions):
         #partition_score[p] = modularity(Gsub, best_partition=True)
         # modularity crashes in the community package if Gsub has no nodes
         Gsub = G.subgraph(nodes)
-        if Gsub.number_of_nodes() > 1 and Gsub.number_of_edges() > 0:
+        '''
+        Debug code for crashes due to total graph size = 0.0 (edges have a 'weight' data parameters, but all values == 0.0)
+        This cuases community used in modularity() to crash.
+
+        print("modularity_wavg total weights ", G.size(weight='weight'), Gsub.size(weight='weight'), Gsub.number_of_nodes(), Gsub.number_of_edges())
+        if(Gsub.size(weight='weight') == 0):
+            for node in Gsub.nodes():
+                print('n', Gsub.node[node]['weight'])
+                for neigh in Gsub.neighbors(node):
+                    print('e', Gsub.edge[node][neigh]['weight'])
+        '''
+        if Gsub.size(weight = 'weight') == 0.0:
+            # try correcting
+            fix_G_for_modularity(Gsub)
+
+        if Gsub.size(weight = 'weight') > 0.0:
             partition_score[p] = modularity(Gsub, best_partition=True)
         else:
             partition_score[p] = 1.0
