@@ -34,6 +34,7 @@ class GraphPartitioning:
     def load_network(self):
         # read METIS file
         self.G = utils.read_metis(self.DATA_FILENAME)
+        self.initial_number_of_nodes = self.G.number_of_nodes() # used for computing metrics
 
         # Alpha value used in prediction model
         self.prediction_model_alpha = self.G.number_of_edges() * (self.num_partitions / self.G.number_of_nodes()**2)
@@ -228,12 +229,23 @@ class GraphPartitioning:
         x = utils.score(graph, self.assignments, self.num_partitions)
         edges_cut, steps = utils.base_metrics(graph, self.assignments)
 
-        mod = utils.modularity_wavg(graph, self.assignments, self.num_partitions)
+        mod = 0
+        try:
+            mod = utils.modularity_wavg(graph, self.assignments, self.num_partitions)
+        except Exception as err:
+            pass
+
         loneliness = utils.loneliness_score_wavg(graph, self.loneliness_score_param, self.assignments, self.num_partitions)
         max_perm = utils.run_max_perm(graph)
 
         #nmi_score = nmi_metrics.nmi(np.array([self.assignments_prediction_model, self.assignments]))
-        nmi_score = normalized_mutual_info_score(self.assignments_prediction_model.tolist(), self.assignments.tolist())
+        nmi_assignments = self.assignments.tolist()
+        if self.use_virtual_nodes:
+            #print(len(nmi_assignments), self.initial_number_of_nodes)
+            if(len(nmi_assignments) > self.initial_number_of_nodes):
+                nmi_assignments = nmi_assignments[0: self.initial_number_of_nodes]
+
+        nmi_score = normalized_mutual_info_score(self.assignments_prediction_model.tolist(), nmi_assignments)
         if self.verbose > 1:
             print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4}\t{5}\t{6}\t{7:.10f}".format(x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score))
 
@@ -288,7 +300,14 @@ class GraphPartitioning:
         for edge in self.G.edges_iter(data=True):
             left = edge[0]
             right = edge[1]
-            edge_weight = edge[2]['weight_orig']
+
+            edge_weight = 1.0
+            try:
+                edge_weight = edge[2]['weight_orig']
+            except Exception as err:
+                # this may due to the fact that virtual nodes have no original weight
+                pass
+
 
             # new edge weight
             edge[2]['weight'] = (float(G.node[left]['weight']) * edge_weight) * (float(G.node[right]['weight']) * edge_weight)

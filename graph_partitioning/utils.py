@@ -268,7 +268,15 @@ def modularity_wavg(G, assignments, num_partitions):
         else:
             partition_score[p] = 1.0
 
+    average = 0.0
+    try:
+        average = np.average(partition_score, weights=partition_population)
+    except Exception as err:
+        # paritition scores and populations of 0.0 cause exception in np.average
+        pass
+
     return np.average(partition_score, weights=partition_population)
+    return average
 
 def loneliness_score(G, loneliness_score_param):
     total = 0
@@ -288,6 +296,7 @@ def loneliness_score_wavg(G, loneliness_score_param, assignments, num_partitions
     """
     Return a weighted average across all partitions for loneliness score
     """
+
     p = get_partition_population(G, assignments, num_partitions)
     partition_population = [p[x][0] for x in p]
     partition_score = list(range(0, num_partitions))
@@ -297,7 +306,14 @@ def loneliness_score_wavg(G, loneliness_score_param, assignments, num_partitions
         Gsub = G.subgraph(nodes)
         partition_score[p] = loneliness_score(Gsub, loneliness_score_param)
 
-    return np.average(partition_score, weights=partition_population)
+    average = 0.0
+    try:
+        np.average(partition_score, weights=partition_population)
+    except Exception as err:
+        # assignments has no partitions
+        pass
+    #return np.average(partition_score, weights=partition_population)
+    return average
 
 
 def run_max_perm(G, relabel_nodes=False):
