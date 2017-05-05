@@ -130,6 +130,9 @@ class GraphPartitioning:
         if self.PREDICTION_MODEL_ALGORITHM == 'PATOH':
             #sys.path.insert(0, self.SCOTCH_PYLIB_REL_PATH)
 
+            # edge expansion happens via hyperedge expansion in PaToH's patoh_data.py script
+            self.edge_expansion_enabled = False
+
             # check if the library is present
             if not os.path.isfile(self.PATOH_LIB_PATH):
                 raise ImportError("Could not locate the PaToH library file at: {}".format(self.PATOH_LIB_PATH))

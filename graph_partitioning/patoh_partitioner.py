@@ -70,7 +70,7 @@ class PatohPartitioner():
         iterations = {}
         for i in range(0, self.partitioningIterations):
             _assignments = self._runPartitioning(G, num_partitions, patoh_assignments, nodeMapping, assignments)
-            edges_cut, steps = gputils.base_metrics(graph, _assignments)
+            edges_cut, steps, cut_edges = gputils.base_metrics(graph, _assignments)
             if edges_cut not in list(iterations.keys()):
                 iterations[edges_cut] = _assignments
 
