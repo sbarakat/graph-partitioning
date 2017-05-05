@@ -530,3 +530,8 @@ def get_cmap(N):
     def map_index_to_rgb_color(index):
         return scalar_map.to_rgba(index)
     return map_index_to_rgb_color
+
+def generateRandIntArray(minValue, maxValueExcluded, size):
+    # generates an np.array of size=size of random integers in the range [minValue, maxValueExcluded)
+    # i.e. min = 0, max = 10 generates random int values 0-9 included
+    return np.random.randint(minValue, maxValueExcluded, size)
