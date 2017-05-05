@@ -25,7 +25,7 @@ class FennelPartitioner():
         # calculate votes based on neighbors placed in partitions
         for right_node in node_neighbors:
             if partition[right_node] != UNMAPPED:
-                partition_votes[partition[right_node]] += graph[node][right_node]['weight']
+                partition_votes[partition[right_node]] += graph.edge[node][right_node]['weight']
                 #partition_votes_nodes[partition[right_node]] += 1
 
         return partition_votes
@@ -155,4 +155,3 @@ class FennelPartitioner():
             assignments = self.fennel(graph, num_partitions, assignments, fixed, self.PREDICTION_MODEL_ALPHA)
 
         return np.asarray(assignments)
-

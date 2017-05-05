@@ -29,6 +29,9 @@ class GraphPartitioning:
 
         if(self.verbose == 0):
             self._quiet = True
+
+        self.originalG = None
+
         self.compute_output_filenames()
 
     def load_network(self):
@@ -78,6 +81,10 @@ class GraphPartitioning:
 
             edge_weights = {(e[0], e[1]): e[2]['weight'] for e in self.G.edges_iter(data=True)}
             nx.set_edge_attributes(self.G, 'weight_orig', edge_weights)
+
+        # make a copy of the original graph since we may alter the graph later on
+        # and may want to refer to information from the original graph
+        self.originalG = self.G.copy()
 
     def init_partitioner(self):
         self.prediction_model_algorithm = None
@@ -165,7 +172,6 @@ class GraphPartitioning:
         if self.PREDICTION_MODEL:
             with open(self.PREDICTION_MODEL, "r") as inf:
                 self.assignments = np.fromiter(inf.readlines(), dtype=np.int32)
-
         else:
             if self.graph_modification_functions:
                 self.G = self._edge_expansion(self.G)
@@ -227,7 +233,7 @@ class GraphPartitioning:
             graph = self.G
 
         x = utils.score(graph, self.assignments, self.num_partitions)
-        edges_cut, steps = utils.base_metrics(graph, self.assignments)
+        edges_cut, steps, cut_edges = utils.base_metrics(graph, self.assignments)
 
         mod = 0
         try:
@@ -246,10 +252,16 @@ class GraphPartitioning:
                 nmi_assignments = nmi_assignments[0: self.initial_number_of_nodes]
 
         nmi_score = normalized_mutual_info_score(self.assignments_prediction_model.tolist(), nmi_assignments)
-        if self.verbose > 1:
-            print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4}\t{5}\t{6}\t{7:.10f}".format(x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score))
 
-        return [x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score]
+        # compute the sum of edge weights for all the cut edges for a total score
+        total_cut_weight = 0
+        for cutEdge in cut_edges:
+            total_cut_weight += self.originalG.edge[cutEdge[0]][cutEdge[1]]['weight']
+
+        if self.verbose > 1:
+            print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4}\t{5}\t{6}\t{7:.10f}\t{8}".format(x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score, total_cut_weight))
+
+        return [x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score, total_cut_weight]
 
     def assign_cut_off(self):
         # stop assignments when x% of arriving people is assinged
@@ -283,7 +295,9 @@ class GraphPartitioning:
             if self.fixed[i] == -1:
                 self.assignments[i] = -1
 
-        run_metrics = [self._print_score()]
+        GSub = self.G.subgraph(self.nodes_arrived)
+
+        run_metrics = [self._print_score(GSub)]
         self._print_assignments()
 
         if self.verbose > 0:
@@ -296,6 +310,9 @@ class GraphPartitioning:
 
 
     def _edge_expansion(self, G):
+        if(self.edge_expansion_enabled == False):
+            return G
+
         # Update edge weights for nodes that have an assigned probability of displacement
         for edge in self.G.edges_iter(data=True):
             left = edge[0]
@@ -558,7 +575,7 @@ class GraphPartitioning:
         })
 
         # edges cut and communication volume
-        edges_cut, steps = utils.base_metrics(self.G, self.assignments)
+        edges_cut, steps, cut_edges = utils.base_metrics(self.G, self.assignments)
         graph_metrics.update({
             "edges_cut": edges_cut,
             "total_communication_volume": steps,
