@@ -72,7 +72,15 @@ def read_metis(DATA_FILENAME):
                         G.add_nodes_from([n], weight=int(e[0]))
 
                 elif has_edge_weights and not has_node_weights:
-                    pass
+                    if len(e) > 0:
+                        edges_split = list(zip(*[iter(e)] * 2))
+                        edge_list = [(n, int(v[0]) - 1, {'weight': int(v[1])}) for v in edges_split]
+
+                        G.add_edges_from(edge_list)
+                        G.node[n]['weight'] = 1.0
+                    else:
+                        G.add_nodes_from([n], weight=1.0)
+
                 elif not has_edge_weights and has_node_weights:
                     pass
                 else:
@@ -185,6 +193,7 @@ def base_metrics(G, assignments=None):
     steps = 0
     edges_cut = 0
     seen = []
+    cut_edges = []
     for n in G.nodes_iter():
         partition_seen = []
         for e in G.edges_iter(n):
@@ -209,12 +218,13 @@ def base_metrics(G, assignments=None):
                 if left_partition != right_partition:
                     # right node in different partition
                     edges_cut += 1
+                    cut_edges.append((left, right))
 
             if left_partition != right_partition and right_partition not in partition_seen:
                 steps += 1
                 partition_seen.append(right_partition)
 
-    return (edges_cut, steps)
+    return (edges_cut, steps, cut_edges)
 
 def modularity(G, assignments=None, best_partition=False):
     if best_partition:
