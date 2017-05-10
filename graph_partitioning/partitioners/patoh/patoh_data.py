@@ -202,9 +202,8 @@ class PatohData:
                     if edgeWeight > hyperedgeWeight:
                         hyperedgeWeight = nodeWeight
 
-
         if 'squared' in hyperedgeExpansionMode:
-            # take the square root
+            # take the square
             hyperedgeWeight = hyperedgeWeight ** 2.0
 
         if 'sqrt' in hyperedgeExpansionMode:

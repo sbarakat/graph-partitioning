@@ -545,3 +545,133 @@ def generateRandIntArray(minValue, maxValueExcluded, size):
     # generates an np.array of size=size of random integers in the range [minValue, maxValueExcluded)
     # i.e. min = 0, max = 10 generates random int values 0-9 included
     return np.random.randint(minValue, maxValueExcluded, size)
+
+
+# fscores
+from sklearn.metrics import f1_score
+from scipy.optimize import linear_sum_assignment
+
+def fscores2(predictionModel, assignments, num_partitions):
+    prediction = np.array(predictionModel, copy=True)
+    batch = np.array(assignments, copy=True)
+
+    pm = []
+    btch = []
+    for i, partition in enumerate(batch):
+        if partition >= 0:
+            pm.append(prediction[i])
+            btch.append(partition)
+
+    prediction = np.array(pm)
+    batch = np.array(btch)
+
+    fscore = f1_score(prediction, batch, average='weighted')
+
+    fscorematrix = []
+    for i in range(0, num_partitions):
+        fi = []
+        fi_correct = []
+        for j in range(0, num_partitions):
+            batch_ij = relabelArray(batch, i, j)
+            fi.append(1.0 - f1_score(prediction, batch_ij, average='weighted'))
+        fscorematrix.append(fi)
+
+    cost = np.array(fscorematrix)
+    row_ind, col_ind = linear_sum_assignment(cost)
+    print('Hungarian rows', row_ind)
+    print('Hungarian cols', col_ind)
+
+    relabelled_batch = batch
+
+    relabel_done = {}
+    for i, row in enumerate(row_ind):
+        # check if done already
+        col = col_ind[i]
+        if col == row:
+            continue
+
+        if(col < row):
+            if col in relabel_done:
+                #if row in relabel_done[col]:
+                continue
+            relabel_done[col] = row
+        else:
+            if row in relabel_done:
+                continue
+            relabel_done[row] = col
+        relabelled_batch = relabelArray(relabelled_batch, row, col_ind[i])
+
+    fscore_relabelled = f1_score(prediction, relabelled_batch, average='weighted')
+    return(fscore, fscore_relabelled)
+
+def fscores(predictionModel, assignments, num_partitions):
+    prediction = np.array(predictionModel, copy=True)
+    batch = np.array(assignments, copy=True)
+
+    predModelPartition = []
+    batchPartition = []
+
+    # extract only the partitions for the nodes that have arrived
+    for i, partition in enumerate(batch):
+        if partition >= 0:
+            predModelPartition.append(prediction[i])
+            batchPartition.append(partition)
+
+    predModelPartition = np.array(predModelPartition)
+    batchPartition = np.array(batchPartition)
+
+    # compute fscore
+    fscore = f1_score(predModelPartition, batchPartition, average='weighted')
+
+    # compute relabelled fscore
+    fscore_relabelled = fscore_relabel(predModelPartition, batchPartition, num_partitions)
+
+    return (fscore, fscore_relabelled)
+
+def relabelArray(array, v1, v2):
+    newArr = []
+    for val in array:
+        if(val == v1):
+            newArr.append(v2)
+        elif (val == v2):
+            newArr.append(v1)
+        else:
+            newArr.append(val)
+    return newArr
+
+def fscore_relabel(predictionModel, batch, num_partitions):
+    fscorematrix = []
+    for i in range(0, num_partitions):
+        fi = []
+        for j in range(0, num_partitions):
+            batch_ij = relabelArray(batch, i, j)
+            fi.append(1.0 - f1_score(predictionModel, batch_ij, average='weighted'))
+        fscorematrix.append(fi)
+
+    fscorematrix = np.array(fscorematrix)
+    # hungarian algorithm
+    row_ind, col_ind = linear_sum_assignment(fscorematrix)
+    #print('Hungarian rows', row_ind)
+    #print('Hungarian cols', col_ind)
+
+    relabelled_batch = batch
+
+    relabel_done = {} # stores which combination of partition values have been swapped
+    for i, row in enumerate(row_ind):
+        # check if done already
+        col = col_ind[i]
+        if col == row:
+            continue
+        if(col < row):
+            if col in relabel_done:
+                #if row in relabel_done[col]:
+                continue
+            relabel_done[col] = row
+        else:
+            if row in relabel_done:
+                continue
+            relabel_done[row] = col
+
+        relabelled_batch = relabel(relabelled_batch, row, col_ind[i])
+
+    return f1_score(predictionModel, relabelled_batch, average='weighted')

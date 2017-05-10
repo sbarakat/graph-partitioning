@@ -130,8 +130,6 @@ class GraphPartitioning:
         if self.PREDICTION_MODEL_ALGORITHM == 'PATOH':
             #sys.path.insert(0, self.SCOTCH_PYLIB_REL_PATH)
 
-            # edge expansion happens via hyperedge expansion in PaToH's patoh_data.py script
-            self.edge_expansion_enabled = False
 
             # check if the library is present
             if not os.path.isfile(self.PATOH_LIB_PATH):
@@ -139,7 +137,8 @@ class GraphPartitioning:
 
             from graph_partitioning import patoh_partitioner
 
-            self.prediction_model_algorithm = patoh_partitioner.PatohPartitioner(self.PATOH_LIB_PATH, quiet=self._quiet, partitioningIterations=self.PATOH_ITERATIONS)
+            self.prediction_model_algorithm = patoh_partitioner.PatohPartitioner(self.PATOH_LIB_PATH, quiet=self._quiet,
+                partitioningIterations=self.PATOH_ITERATIONS, hyperedgeExpansionMode=self.PATOH_HYPEREDGE_EXPANSION_MODE)
             if not self._quiet:
                 print("PaToH partitioner loaded for generating PREDICTION MODEL.")
 
@@ -148,6 +147,12 @@ class GraphPartitioning:
                 self.partition_algorithm = self.prediction_model_algorithm
                 if not self._quiet:
                     print("PaToH partitioner loaded for making shelter assignments.")
+
+            # edge expansion happens via hyperedge expansion in PaToH's patoh_data.py script
+            if(self.edge_expansion_enabled):
+                self.edge_expansion_enabled = False
+                self.prediction_model_algorithm.hyperedgeExpansionMode = 'no_expansion'
+
 
         if self.prediction_model_algorithm == None:
             raise NoPartitionerException("Prediction model partitioner not specified or incorrect. Available partitioners are 'FENNEL' or 'SCOTCH'.")
@@ -261,10 +266,14 @@ class GraphPartitioning:
         for cutEdge in cut_edges:
             total_cut_weight += self.originalG.edge[cutEdge[0]][cutEdge[1]]['weight']
 
-        if self.verbose > 1:
-            print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4}\t{5}\t{6}\t{7:.10f}\t{8}".format(x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score, total_cut_weight))
+        # compute fscores
+        fscore, fscore_relabelled = utils.fscores2(self.assignments_prediction_model, self.assignments, self.num_partitions)
+        #print('fscores:', fscore, fscore_relabelled)
 
-        return [x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score, total_cut_weight]
+        if self.verbose > 1:
+            print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4}\t{5}\t{6}\t{7:.10f}\t{8}\t{9}\t{10}".format(x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)))
+
+        return [x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)]
 
     def assign_cut_off(self):
         # stop assignments when x% of arriving people is assinged
