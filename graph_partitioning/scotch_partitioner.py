@@ -222,6 +222,7 @@ class ScotchPartitioner():
         return indeces
 
     def _requiresVirtualNodes(self, graph):
+        return False
         if (self.virtualNodesEnabled == False):
             # we don't allow virtual nodes
             return False

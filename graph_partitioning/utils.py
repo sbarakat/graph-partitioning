@@ -318,7 +318,7 @@ def loneliness_score_wavg(G, loneliness_score_param, assignments, num_partitions
 
     average = 0.0
     try:
-        np.average(partition_score, weights=partition_population)
+        average = np.average(partition_score, weights=partition_population)
     except Exception as err:
         # assignments has no partitions
         pass
@@ -332,14 +332,28 @@ def run_max_perm(G, relabel_nodes=False):
     edges_filename = os.path.join(temp_dir, "edges-maxperm.txt")
 
     # MaxPerm requires nodes in sequential order
+    relabel_nodes = True # Do the relabel as maxperm wants nodes labelled 0...n-1 where n = G.number_of_nodes()
+    Gcopy = None
     if relabel_nodes:
-        mapping = dict(zip(G.nodes(), range(0, len(G.nodes()))))
-        nx.relabel_nodes(G, mapping, copy=False)
+        #mapping = dict(zip(G.nodes(), range(0, len(G.nodes()))))
+        #print("mapping", mapping)
+
+        nodes = sorted(G.nodes())
+        nodeMapping = {}
+        for i, n in enumerate(nodes):
+            #nx.relabel_nodes(G, {n:i}, copy=False)
+            nodeMapping[n] = i
+        #Gcopy = nx.relabel_nodes(G, nodeMapping, copy=True)
+        Gcopy = nx.Graph()
+        for node in G.nodes():
+            Gcopy.add_node(nodeMapping[node])
+            for edge in G.neighbors(node):
+                Gcopy.add_edge(nodeMapping[node], nodeMapping[edge])
 
     # write edge list in a format for MaxPerm, tab delimited
     with open(edges_filename, "w") as outf:
-        outf.write("{}\t{}\n".format(G.number_of_nodes(), G.number_of_edges()))
-        for e in sorted(G.edges_iter()):
+        outf.write("{}\t{}\n".format(Gcopy.number_of_nodes(), Gcopy.number_of_edges()))
+        for e in sorted(Gcopy.edges_iter()):
             outf.write("{}\t{}\n".format(*e))
 
     # cat edge list into MaxPerm bin

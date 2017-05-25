@@ -152,6 +152,9 @@ class GraphPartitioning:
             if(self.edge_expansion_enabled):
                 self.edge_expansion_enabled = False
                 self.prediction_model_algorithm.hyperedgeExpansionMode = 'no_expansion'
+            else:
+                self.prediction_model_algorithm.hyperedgeExpansionMode = 'no_expansion'
+                
 
 
         if self.prediction_model_algorithm == None:
