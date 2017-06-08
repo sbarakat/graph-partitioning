@@ -90,6 +90,7 @@ class PatohData:
 
             node_weights = []
             clique_edge_weights = []
+            clique_node_weights = []
 
             edges_added = []
 
@@ -98,6 +99,7 @@ class PatohData:
                 try:
                     weight = G.node[node]['weight']
                     #node_weights.append(weight)
+                    clique_node_weights.append(weight)
                     self.cwghts[node] = weight
                 except Exception as err:
                     #print('node weight exception', err)
@@ -124,8 +126,12 @@ class PatohData:
                         print('clique edge error', err)
 
                 self.pins.append(node)
+
             # compute clique edge expansion
-            hyperedgeWeight = self._hyperedgeExpansion(clique_edge_weights, hyperedgeExpansionMode)
+            if '_complete' in hyperedgeExpansionMode:
+                hyperedgeWeight = self._hyperedgeExpansionComplete(clique_node_weights, hyperedgeExpansionMode)
+            else:
+                hyperedgeWeight = self._hyperedgeExpansion(clique_node_weights, hyperedgeExpansionMode)
 
             #print('hyperedge', len(clique), hyperedgeExpansionMode, hyperedgeWeight)
 
@@ -164,6 +170,44 @@ class PatohData:
         self._targetweights = putils.exportArrayToNumpyArray(self.targetweights, dtype=np.float32)
         self._partweights = putils.exportArrayToNumpyArray(self.partweights)
 
+    def _hyperedgeExpansionComplete(self, hyperedge_edge_weights, hyperedgeExpansionMode):
+        '''
+            This method takes all the edge weights and generates a complete graph between nodes
+            It then applies the normal _hyperedgeExpansion.
+
+            E.g. if a hyperedge has nodes with weights A, B, C, D, then _hyperedgeExpansion with product_sqrt mode would compute:
+            sqrt(A*B*C*D).
+
+            With _hyperedgeExpansionComplete we compute instead:
+            Step 1:
+            (A*B)^2 = H0
+            (A*C)^2 = H1
+            (A*D)^2 = H2
+            (B*C)^2 = H3
+            (B*D)^2 = H4
+            (C*D)^2 = H5
+            Step 2:
+            _hyperedgeExpansion([H0, H1, ..., H5])
+        '''
+        # generate complete graph of nodes for the number of hyperedge nodes
+        g = nx.complete_graph(len(hyperedge_edge_weights))
+
+        # store all the new hyperedge weights
+        hWeightsNew = []
+        for edge in g.edges():
+            w1 = hyperedge_edge_weights[edge[0]]
+            w2 = hyperedge_edge_weights[edge[1]]
+
+            h = (w1 * w2) * 0.1
+
+            hWeightsNew.append(h)
+
+        #if(len(hWeightsNew) == 0):
+        #    hWeightsNew = hyperedge_edge_weights
+
+        return self._hyperedgeExpansion(hWeightsNew, hyperedgeExpansionMode)
+        #print('Hyperedge?', hWeightsNew, expansion)
+        #return expansion
 
     def _hyperedgeExpansion(self, hyperedge_edge_weights, hyperedgeExpansionMode):
         ''' Net is the clique (hyperedge) '''
@@ -182,25 +226,29 @@ class PatohData:
 
         hyperedgeWeight = 0.0
         for i, edgeWeight in enumerate(hyperedge_edge_weights):
-            if 'avg_edge_weight' in hyperedgeExpansionMode:
+            if 'avg_node_weight' in hyperedgeExpansionMode:
                 hyperedgeWeight += edgeWeight
                 if ((i + 1) == len(hyperedge_edge_weights)):
                     # last item
                     hyperedgeWeight = hyperedgeWeight / len(hyperedge_edge_weights)
-            elif 'total_edge_weight' in hyperedgeExpansionMode:
+            elif 'total_node_weight' in hyperedgeExpansionMode:
                 hyperedgeWeight += edgeWeight
-            elif 'smallest_edge_weight':
+            elif 'smallest_node_weight' in hyperedgeExpansionMode:
                 if i == 0:
                     hyperedgeWeight = edgeWeight
                 else:
                     if edgeWeight < hyperedgeWeight:
                         hyperedgeWeight = edgeWeight
-            elif 'largest_edge_weight':
+            elif 'largest_node_weight' in hyperedgeExpansionMode:
                 if i == 0:
                     hyperedgeWeight = edgeWeight
                 else:
                     if edgeWeight > hyperedgeWeight:
-                        hyperedgeWeight = nodeWeight
+                        hyperedgeWeight = edgeWeight
+            elif 'product_node_weight' in hyperedgeExpansionMode:
+                if i == 0:
+                    hyperedgeWeight = 1.0
+                hyperedgeWeight = hyperedgeWeight * edgeWeight
 
         if 'squared' in hyperedgeExpansionMode:
             # take the square
@@ -209,4 +257,8 @@ class PatohData:
         if 'sqrt' in hyperedgeExpansionMode:
             hyperedgeWeight = hyperedgeWeight ** 0.5
 
-        return round(hyperedgeWeight)
+        rounded = round(hyperedgeWeight)
+        if(rounded <= 0):
+            rounded = 1
+        return rounded
+        #return round(hyperedgeWeight)

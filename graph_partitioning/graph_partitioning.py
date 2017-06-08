@@ -137,24 +137,28 @@ class GraphPartitioning:
 
             from graph_partitioning import patoh_partitioner
 
-            self.prediction_model_algorithm = patoh_partitioner.PatohPartitioner(self.PATOH_LIB_PATH, quiet=self._quiet,
+            isQuiet = False
+            if(self.verbose == 0):
+                isQuiet = True
+
+            self.prediction_model_algorithm = patoh_partitioner.PatohPartitioner(self.PATOH_LIB_PATH, quiet=isQuiet,
                 partitioningIterations=self.PATOH_ITERATIONS, hyperedgeExpansionMode=self.PATOH_HYPEREDGE_EXPANSION_MODE)
-            if not self._quiet:
+            if self.verbose > 0:
                 print("PaToH partitioner loaded for generating PREDICTION MODEL.")
 
             if self.PARTITIONER_ALGORITHM == 'PATOH':
                 # use the same prediction_model_algorithm for both batch and prediction modes
                 self.partition_algorithm = self.prediction_model_algorithm
-                if not self._quiet:
+                if self.verbose > 0:
                     print("PaToH partitioner loaded for making shelter assignments.")
 
             # edge expansion happens via hyperedge expansion in PaToH's patoh_data.py script
             if(self.edge_expansion_enabled):
                 self.edge_expansion_enabled = False
-                self.prediction_model_algorithm.hyperedgeExpansionMode = 'no_expansion'
+                self.prediction_model_algorithm.hyperedgeExpansionMode = self.PATOH_HYPEREDGE_EXPANSION_MODE
             else:
                 self.prediction_model_algorithm.hyperedgeExpansionMode = 'no_expansion'
-                
+
 
 
         if self.prediction_model_algorithm == None:
@@ -246,23 +250,36 @@ class GraphPartitioning:
         x = utils.score(graph, self.assignments, self.num_partitions)
         edges_cut, steps, cut_edges = utils.base_metrics(graph, self.assignments)
 
-        mod = 0
-        try:
-            mod = utils.modularity_wavg(graph, self.assignments, self.num_partitions)
-        except Exception as err:
-            pass
+        q_qds_conductance = utils.louvainModularityComQuality(graph, self.assignments, self.num_partitions)
+
+        #mod = 0
+        #try:
+        #    mod = utils.modularity_wavg(graph, self.assignments, self.num_partitions)
+        #except Exception as err:
+        #    pass
 
         loneliness = utils.loneliness_score_wavg(graph, self.loneliness_score_param, self.assignments, self.num_partitions)
         max_perm = utils.run_max_perm(graph)
 
         #nmi_score = nmi_metrics.nmi(np.array([self.assignments_prediction_model, self.assignments]))
         nmi_assignments = self.assignments.tolist()
+        pred_assignments = self.assignments_prediction_model.tolist()
+        pred_nmi_assignments = []
+        actual_nmi_assignments = []
         if self.use_virtual_nodes:
             #print(len(nmi_assignments), self.initial_number_of_nodes)
             if(len(nmi_assignments) > self.initial_number_of_nodes):
                 nmi_assignments = nmi_assignments[0: self.initial_number_of_nodes]
 
-        nmi_score = normalized_mutual_info_score(self.assignments_prediction_model.tolist(), nmi_assignments)
+        for i, partition in enumerate(nmi_assignments):
+            if partition >= 0:
+                pred_nmi_assignments.append(pred_assignments[i])
+                actual_nmi_assignments.append(partition)
+
+        #print("nmi_assignments", nmi_assignments)
+
+        #nmi_score = normalized_mutual_info_score(self.assignments_prediction_model.tolist(), nmi_assignments)
+        nmi_score = normalized_mutual_info_score(pred_nmi_assignments, actual_nmi_assignments)
 
         # compute the sum of edge weights for all the cut edges for a total score
         total_cut_weight = 0
@@ -274,9 +291,11 @@ class GraphPartitioning:
         #print('fscores:', fscore, fscore_relabelled)
 
         if self.verbose > 1:
-            print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4}\t{5}\t{6}\t{7:.10f}\t{8}\t{9}\t{10}".format(x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)))
+            print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4:.5f}\t{5:.5f}\t{6:.5f}\t{7}\t{8}\t{9:.10f}\t{10}\t{11}\t{12}".format(x[0], x[1], edges_cut, steps, q_qds_conductance[0], q_qds_conductance[1], q_qds_conductance[2], loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)))
+            #print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4}\t{5}\t{6}\t{7:.10f}\t{8}\t{9}\t{10}".format(x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)))
 
-        return [x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)]
+        return [x[0], x[1], edges_cut, steps, q_qds_conductance[0], q_qds_conductance[1], q_qds_conductance[2], loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)]
+        #return [x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)]
 
     def assign_cut_off(self):
         # stop assignments when x% of arriving people is assinged

@@ -226,6 +226,144 @@ def base_metrics(G, assignments=None):
 
     return (edges_cut, steps, cut_edges)
 
+def louvainModularityComQuality(G, assignments, num_partitions):
+    p = get_partition_population(G, assignments, num_partitions)
+    partition_population = [p[x][0] for x in p]
+    partition_score = list(range(0, num_partitions))
+
+    temp_dir = tempfile.mkdtemp()
+    #print(temp_dir)
+
+    partition_metrics = [0.0, 0.0, 0.0]
+
+    for p in range(0, num_partitions):
+        #print('partition', p)
+        nodes = [i for i,x in enumerate(assignments) if x == p]
+        Gsub = G.subgraph(nodes)
+        communities = community.best_partition(Gsub)
+        sorted_nodes = sorted(nodes)
+
+        network_path = os.path.join(temp_dir, 'network_' + str(p) + '.txt')
+        community_path = os.path.join(temp_dir, 'community_' + str(p) + '.txt')
+
+        # write the network file
+        with open(network_path, 'w+') as f:
+            # write node_id other_node_id edge_weight
+            for node in sorted_nodes:
+                for neighbor in Gsub.neighbors(node):
+                    weight = 1
+                    try:
+                        weight = int(G.edge[node][neighbor]['weight'])
+                    except Exception as err:
+                        pass
+                    f.write(str(node) + " " + str(neighbor) + " " + str(weight) + "\n")
+
+        # collect nodes for each community
+        communityNodes = {}
+        for node in sorted_nodes:
+            nodeCommunity = communities[node]
+            if nodeCommunity in communityNodes:
+                communityNodes[nodeCommunity].append(node)
+            else:
+                communityNodes[nodeCommunity] = [node]
+
+        # write the communities file
+        with open(community_path, 'w+') as f:
+            for key in sorted(communityNodes.keys()):
+                s = ''
+                for node in sorted(communityNodes[key]):
+                    if len(s):
+                        s = s + " "
+                    s = s + str(node)
+                f.write(s + '\n')
+        # run ComQuality
+        com_qual_path = os.path.join(BIN_DIRECTORY, "ComQualityMetric")
+        com_qual_log = os.path.join(temp_dir, 'quality.log')
+        args = ["java", "CommunityQualityUpdated", "-weighted", network_path, community_path]
+
+        with open(com_qual_log, "w+") as logwriter:
+            retval = subprocess.call(
+                args, cwd=com_qual_path,
+                stdout=logwriter, stderr=subprocess.STDOUT)
+
+        # return metrics
+        with open(com_qual_log, "r") as fp:
+            metrics = {}
+            for line in fp:
+                m = [p.strip() for p in line.split(',')]
+                metrics.update(dict(map(lambda y:y.split(' = '), m)))
+            partition_metrics[0] += float(metrics['Q'])
+            partition_metrics[1] += float(metrics['Qds'])
+            partition_metrics[2] += float(metrics['conductance'])
+
+    partition_metrics[0] = partition_metrics[0] / 4.0
+    partition_metrics[1] = partition_metrics[1] / 4.0
+    partition_metrics[2] = partition_metrics[2] / 4.0
+
+    shutil.rmtree(temp_dir)
+
+    return [partition_metrics[0], partition_metrics[1], partition_metrics[2]]
+
+def modularityComQuality(G, assignments, num_partitions):
+    p = get_partition_population(G, assignments, num_partitions)
+    partition_population = [p[x][0] for x in p]
+    partition_score = list(range(0, num_partitions))
+
+    for p in range(0, num_partitions):
+        nodes = [i for i,x in enumerate(assignments) if x == p]
+        Gsub = G.subgraph(nodes)
+        communities = community.best_partition(Gsub)
+        sorted_nodes = sorted(nodes)
+        print("partition nodes for p", p)
+        print(sorted_nodes)
+        with open('/Users/voreno/Desktop/tmp/network_' + str(p) + '.txt', 'w+') as f:
+            for node in sorted_nodes:
+                for neighbor in Gsub.neighbors(node):
+                    weight = 1
+                    try:
+                        weight = int(G.edge[node][neighbor]['weight'])
+                    except Exception as err:
+                        pass
+                    f.write(str(node) + " " + str(neighbor) + " " + str(weight) + "\n")
+
+        communityNodes = {}
+
+        print("partition communities for p", p)
+        for node in sorted_nodes:
+            nodeCommunity = communities[node]
+            if nodeCommunity in communityNodes:
+                communityNodes[nodeCommunity].append(node)
+            else:
+                communityNodes[nodeCommunity] = [node]
+        with open('/Users/voreno/Desktop/tmp/community_' + str(p) + '.txt', 'w+') as f:
+            for key in sorted(communityNodes.keys()):
+                s = ''
+                for node in sorted(communityNodes[key]):
+                    if len(s):
+                        s = s + " "
+                    s = s + str(node)
+                f.write(s + '\n')
+
+        adjacencyMatrix = np.array(nx.to_numpy_matrix(Gsub, sorted(Gsub.nodes())))
+
+        # create a temporary directory and create input files results
+        #temp_dir = tempfile.mkdtemp()
+        #print(temp_dir)
+        print("partition adjacency numbers for p", p, Gsub.number_of_nodes())
+
+        #adjMatrixFilePath = os.path.join(temp_dir, "adjacency_matrix.txt")
+        with open('/Users/voreno/Desktop/tmp/adjacency_' + str(p) + '.txt', 'w+') as f:
+            for row in adjacencyMatrix:
+                rowStr = ''
+                for adj in row:
+                    if len(rowStr):
+                        rowStr += " "
+                    if adj > 0:
+                        rowStr += str(int(1))
+                    else:
+                        rowStr += str(int(0))
+                f.write(rowStr + '\n')
+
 def modularity(G, assignments=None, best_partition=False):
     if best_partition:
         part = community.best_partition(G)
@@ -287,6 +425,40 @@ def modularity_wavg(G, assignments, num_partitions):
 
     return np.average(partition_score, weights=partition_population)
     return average
+
+def modularityDensityBotta(G, num_iterations):
+    # compute sparse adjacency matrix
+    adjacencyMatrix = np.array(nx.to_numpy_matrix(G, sorted(G.nodes())))
+
+    # create a temporary directory and create input files results
+    temp_dir = tempfile.mkdtemp()
+    print(temp_dir)
+
+    adjMatrixFilePath = os.path.join(temp_dir, "adjacency_matrix.txt")
+    with open(adjMatrixFilePath, 'w+') as f:
+        for row in adjacencyMatrix:
+            rowStr = ''
+            for adj in row:
+                if len(rowStr):
+                    rowStr += " "
+                rowStr += str(int(adj))
+            f.write(rowStr + '\n')
+
+    binary = os.path.join(BIN_DIRECTORY, 'bottaModularityDensity')
+    if 'Linux' in platform.system():
+        binary = os.path.join(binary, 'BottaModularityDensityLinux')
+    elif 'Darwin' in platform.system():
+        binary = os.path.join(binary, 'BottaModularityDensityMacOS')
+
+    modularityArgs = [binary, adjMatrixFilePath, str(G.number_of_nodes()), str(num_iterations)]
+
+    print(modularityArgs)
+
+    retval = subprocess.call(modularityArgs, cwd=temp_dir)
+    print(retval)
+    # clean_up
+    #shutil.rmtree(temp_dir)
+
 
 def loneliness_score(G, loneliness_score_param):
     total = 0
@@ -592,8 +764,6 @@ def fscores2(predictionModel, assignments, num_partitions):
 
     cost = np.array(fscorematrix)
     row_ind, col_ind = linear_sum_assignment(cost)
-    print('Hungarian rows', row_ind)
-    print('Hungarian cols', col_ind)
 
     relabelled_batch = batch
 
