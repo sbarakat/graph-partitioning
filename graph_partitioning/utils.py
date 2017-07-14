@@ -859,3 +859,32 @@ def fscore_relabel(predictionModel, batch, num_partitions):
         relabelled_batch = relabel(relabelled_batch, row, col_ind[i])
 
     return f1_score(predictionModel, relabelled_batch, average='weighted')
+
+
+def leverage_centrality(graph):
+    '''
+    The leverage centrality in this paper is defined as a measure of the relationship between
+    the degree of a given node (ki) and the degree of each of its neighbors (kj),
+    averaged over all neighbors (Ni).
+
+    The algorithm runs as following:
+    1. compute degrees of each node (number of edges for each node) (ki)
+    2. for each node, compute the mean([ki - kj]/[ki + kj]) for each neighbour j of node i, which is the leverage score
+    '''
+
+    n = graph.number_of_nodes()
+    k = graph.degree() # returns dict of {node:degree} values
+    leverage = {}
+    for i,n in enumerate(sorted(graph.nodes())):
+        # iterate over each node of graph, sorted
+        ki = k[n] # get the degree of node n
+        ni = 0 # neighbor count
+        li = 0.0 # leverage for this node
+        if ki > 0:
+            for neighbor in graph.neighbors(n):
+                ni += 1
+                kj = k[neighbor]
+                li = li + ((ki - kj) / (ki + kj))
+            li = li / ki
+        leverage[n] = li
+    return leverage
