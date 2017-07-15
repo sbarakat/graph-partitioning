@@ -236,7 +236,7 @@ def infomapModularityComQuality(G, assignments, num_partitions):
     partition_score = list(range(0, num_partitions))
 
     temp_dir = tempfile.mkdtemp()
-    print('infomapModularityComQuality dir', temp_dir)
+    #print('infomapModularityComQuality dir', temp_dir)
 
     partition_metrics = [0.0, 0.0, 0.0]
 
@@ -305,7 +305,7 @@ def infomapModularityComQuality(G, assignments, num_partitions):
     partition_metrics[1] = partition_metrics[1] / (1.0 * num_partitions)#4.0
     partition_metrics[2] = partition_metrics[2] / (1.0 * num_partitions)#4.0
 
-    #shutil.rmtree(temp_dir)
+    shutil.rmtree(temp_dir)
 
     return [partition_metrics[0], partition_metrics[1], partition_metrics[2]]
 
