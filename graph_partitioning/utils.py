@@ -3,12 +3,16 @@ import csv
 import gzip
 import shutil
 import tempfile
+import random
 import platform
 import itertools
+import operator
 import subprocess
 import community
 import numpy as np
 import networkx as nx
+
+from graph_partitioning.tools.infomap import infomap #TODO how would this work on windows?
 
 BIN_DIRECTORY = os.path.join(os.path.dirname(__file__), "..", "bin")
 
@@ -226,13 +230,93 @@ def base_metrics(G, assignments=None):
 
     return (edges_cut, steps, cut_edges)
 
+def infomapModularityComQuality(G, assignments, num_partitions):
+    p = get_partition_population(G, assignments, num_partitions)
+    partition_population = [p[x][0] for x in p]
+    partition_score = list(range(0, num_partitions))
+
+    temp_dir = tempfile.mkdtemp()
+    print('infomapModularityComQuality dir', temp_dir)
+
+    partition_metrics = [0.0, 0.0, 0.0]
+
+    for p in range(0, num_partitions):
+        #print('partition', p)
+        nodes = [i for i,x in enumerate(assignments) if x == p]
+        Gsub = G.subgraph(nodes)
+        # communities = {communityID:[communityNodes],...}
+        communityNodes = infomapCommunityDetection(Gsub)
+        sorted_nodes = sorted(nodes)
+
+        network_path = os.path.join(temp_dir, 'network_' + str(p) + '.txt')
+        community_path = os.path.join(temp_dir, 'community_' + str(p) + '.txt')
+
+        # write the network file
+        with open(network_path, 'w+') as f:
+            # write node_id other_node_id edge_weight
+            for node in sorted_nodes:
+                for neighbor in Gsub.neighbors(node):
+                    weight = 1
+                    try:
+                        weight = int(G.edge[node][neighbor]['weight'])
+                    except Exception as err:
+                        pass
+                    f.write(str(node) + " " + str(neighbor) + " " + str(weight) + "\n")
+
+        # collect nodes for each community
+        #communityNodes = {}
+        #for node in sorted_nodes:
+        #    nodeCommunity = communities[node]
+        #    if nodeCommunity in communityNodes:
+        #        communityNodes[nodeCommunity].append(node)
+        #    else:
+        #        communityNodes[nodeCommunity] = [node]
+
+        # write the communities file
+        with open(community_path, 'w+') as f:
+            for key in sorted(communityNodes.keys()):
+                s = ''
+                for node in sorted(communityNodes[key]):
+                    if len(s):
+                        s = s + " "
+                    s = s + str(node)
+                f.write(s + '\n')
+        # run ComQuality
+        com_qual_path = os.path.join(BIN_DIRECTORY, "ComQualityMetric")
+        com_qual_log = os.path.join(temp_dir, 'quality.log')
+        args = ["java", "CommunityQualityUpdated", "-weighted", network_path, community_path]
+
+        with open(com_qual_log, "w+") as logwriter:
+            retval = subprocess.call(
+                args, cwd=com_qual_path,
+                stdout=logwriter, stderr=subprocess.STDOUT)
+
+        # return metrics
+        with open(com_qual_log, "r") as fp:
+            metrics = {}
+            for line in fp:
+                m = [p.strip() for p in line.split(',')]
+                metrics.update(dict(map(lambda y:y.split(' = '), m)))
+            partition_metrics[0] += float(metrics['Q'])
+            partition_metrics[1] += float(metrics['Qds'])
+            partition_metrics[2] += float(metrics['conductance'])
+
+    partition_metrics[0] = partition_metrics[0] / (1.0 * num_partitions)
+    partition_metrics[1] = partition_metrics[1] / (1.0 * num_partitions)#4.0
+    partition_metrics[2] = partition_metrics[2] / (1.0 * num_partitions)#4.0
+
+    #shutil.rmtree(temp_dir)
+
+    return [partition_metrics[0], partition_metrics[1], partition_metrics[2]]
+
+
 def louvainModularityComQuality(G, assignments, num_partitions):
     p = get_partition_population(G, assignments, num_partitions)
     partition_population = [p[x][0] for x in p]
     partition_score = list(range(0, num_partitions))
 
     temp_dir = tempfile.mkdtemp()
-    #print(temp_dir)
+    #print('louvainModularityComQuality dir', temp_dir)
 
     partition_metrics = [0.0, 0.0, 0.0]
 
@@ -296,9 +380,9 @@ def louvainModularityComQuality(G, assignments, num_partitions):
             partition_metrics[1] += float(metrics['Qds'])
             partition_metrics[2] += float(metrics['conductance'])
 
-    partition_metrics[0] = partition_metrics[0] / 4.0
-    partition_metrics[1] = partition_metrics[1] / 4.0
-    partition_metrics[2] = partition_metrics[2] / 4.0
+    partition_metrics[0] = partition_metrics[0] / (1.0 * num_partitions)
+    partition_metrics[1] = partition_metrics[1] / (1.0 * num_partitions)#4.0
+    partition_metrics[2] = partition_metrics[2] / (1.0 * num_partitions)#4.0
 
     shutil.rmtree(temp_dir)
 
@@ -881,10 +965,63 @@ def leverage_centrality(graph):
         ni = 0 # neighbor count
         li = 0.0 # leverage for this node
         if ki > 0:
+            # ki > 0 since it has some neighbors
+            # kj can never be 0 since it is connected to ki
+            # ki + kj >= 2
+            # the fraction ki - kj
             for neighbor in graph.neighbors(n):
                 ni += 1
                 kj = k[neighbor]
                 li = li + ((ki - kj) / (ki + kj))
             li = li / ki
+        else:
+            li = -1000.0
         leverage[n] = li
-    return leverage
+    return sorted(leverage.items(), key=operator.itemgetter(1),reverse=True)
+
+def reorder_nodes_based_on_leverage_centrality(graph_leverage_scores, batch):
+    reordered_nodes = []
+    outliers = []
+    for leverage in graph_leverage_scores:
+        node = leverage[0]
+        li = leverage[1]
+        if node in batch:
+            if li == -1000.0:
+                outliers.append(node)
+            else:
+                reordered_nodes.append(leverage[0])
+    if len(outliers) > 0:
+        reordered_nodes = reordered_nodes + random.sample(outliers, len(outliers))
+    return reordered_nodes
+
+
+def infomapCommunityDetection(graph):
+    """
+    Partition network with the Infomap algorithm.
+    Returns a dictionary of node lists. The key is the community ID and the list contains all the sorted nodes belonging to that community
+    """
+
+    print('Calling infomap detection for nodes', graph.nodes())
+
+    infomapWrapper = infomap.Infomap("--two-level --silent")
+    graph_nodes = graph.nodes()
+
+    # build infomap network from networkX graph
+    for e in graph.edges_iter():
+        infomapWrapper.addLink(*e)
+
+    # find the communities with Infomap
+    infomapWrapper.run();
+    tree = infomapWrapper.tree
+
+    #print("Found %d modules with codelength: %f" % (tree.numTopModules(), tree.codelength()))
+    communities = {}
+    for node in tree.leafIter():
+        node_id = node.originalLeafIndex
+        if node_id in graph_nodes:
+            community = node.moduleIndex()
+            if community in communities:
+                communities[community].append(node_id)
+            else:
+                communities[community] = [node_id]
+    return communities;

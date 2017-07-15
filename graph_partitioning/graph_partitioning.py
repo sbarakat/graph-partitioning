@@ -106,6 +106,9 @@ class GraphPartitioning:
                 if self.verbose > 0:
                     print("FENNEL partitioner loaded for making shelter assignments.")
 
+            if self.FENNEL_NODE_REORDERING_ENABLED:
+                # compute the node leverage centrality scores for the whole graph
+                self.fennel_centrality_reordered_nodes = utils.leverage_centrality(self.G)
 
         if self.PREDICTION_MODEL_ALGORITHM == 'SCOTCH':
 
@@ -250,7 +253,8 @@ class GraphPartitioning:
         x = utils.score(graph, self.assignments, self.num_partitions)
         edges_cut, steps, cut_edges = utils.base_metrics(graph, self.assignments)
 
-        q_qds_conductance = utils.louvainModularityComQuality(graph, self.assignments, self.num_partitions)
+        #q_qds_conductance = utils.louvainModularityComQuality(graph, self.assignments, self.num_partitions)
+        q_qds_conductance = utils.infomapModularityComQuality(graph, self.assignments, self.num_partitions)
 
         #mod = 0
         #try:
@@ -431,6 +435,12 @@ class GraphPartitioning:
 
 
     def process_batch(self, batch_arrived, assign_all=False):
+        # re-order batch_arrived using a FENNEL re-ordering algorithm, if required and configured to do so
+        # TODO add configuration for this
+        if self.PARTITIONER_ALGORITHM == 'FENNEL' and self.FENNEL_NODE_REORDERING_ENABLED:
+            reordered_batch = utils.reorder_nodes_based_on_leverage_centrality(self.fennel_centrality_reordered_nodes, batch_arrived)
+            print('batch reordering', batch_arrived, reordered_batch)
+            batch_arrived = reordered_batch
 
         # GRAPH MODIFICATION FUNCTIONS
         if self.graph_modification_functions:

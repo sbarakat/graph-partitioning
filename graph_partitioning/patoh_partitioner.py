@@ -4,6 +4,7 @@ import time # for PaToH's seed
 
 import numpy as np
 import networkx as nx
+import scipy
 
 import graph_partitioning.utils as gputils
 import graph_partitioning.partitioners.patoh.patoh as pat
@@ -17,6 +18,8 @@ class PatohPartitioner():
         self.partitioningIterations = partitioningIterations
         self.hyperedgeExpansionMode = hyperedgeExpansionMode
 
+        self.runAssignments = {}
+
         self.lib = pat.LibPatoh(self.PATOH_LIB_PATH)
         self.lib.load()
 
@@ -26,6 +29,8 @@ class PatohPartitioner():
                                   num_partitions,
                                   assignments,
                                   fixed):
+        self.runAssignments = {}
+
         # STEP 0: sort the graph nodes
         sortedNodes = sorted(graph.nodes())
 
@@ -70,6 +75,7 @@ class PatohPartitioner():
         iterations = {}
         for i in range(0, self.partitioningIterations):
             _assignments = self._runPartitioning(G, num_partitions, patoh_assignments, nodeMapping, assignments)
+            self.runAssignments[i] = _assignments
             edges_cut, steps, cut_edges = gputils.base_metrics(graph, _assignments)
             if edges_cut not in list(iterations.keys()):
                 iterations[edges_cut] = _assignments
@@ -182,6 +188,9 @@ class PatohPartitioner():
         if self.lib.alloc(patohdata) == False:
             print('Error Allocating Memory for PaToH')
             return assignments
+
+        #print(scipy.stats.describe(patohdata.nwghts))
+        #print(scipy.stats.mode(patohdata.nwghts))
 
         # partition
         ok = self.lib.part(patohdata)
