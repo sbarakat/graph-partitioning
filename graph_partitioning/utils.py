@@ -1001,7 +1001,7 @@ def infomapCommunityDetection(graph):
     Returns a dictionary of node lists. The key is the community ID and the list contains all the sorted nodes belonging to that community
     """
 
-    print('Calling infomap detection for nodes', graph.nodes())
+    #print('Calling infomap detection for nodes', graph.nodes())
 
     infomapWrapper = infomap.Infomap("--two-level --silent")
     graph_nodes = graph.nodes()

@@ -215,6 +215,10 @@ class GraphPartitioning:
         if self.apply_prediction_model_weights:
             self.remove_graph_prediction_weights()
 
+        if self.PREDICTION_MODEL_ALGORITHM == 'FENNEL':
+            # store a copy of the original graph in the fennel partitioner
+            self.partition_algorithm.original_graph = self.G
+
         return run_metrics
 
     def init_virtual_nodes(self):
@@ -439,7 +443,7 @@ class GraphPartitioning:
         # TODO add configuration for this
         if self.PARTITIONER_ALGORITHM == 'FENNEL' and self.FENNEL_NODE_REORDERING_ENABLED:
             reordered_batch = utils.reorder_nodes_based_on_leverage_centrality(self.fennel_centrality_reordered_nodes, batch_arrived)
-            print('batch reordering', batch_arrived, reordered_batch)
+            #print('batch reordering', batch_arrived, reordered_batch)
             batch_arrived = reordered_batch
 
         # GRAPH MODIFICATION FUNCTIONS

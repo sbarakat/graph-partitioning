@@ -5,12 +5,14 @@ from utils import bincount_assigned, score
 
 cdef int UNMAPPED = -1
 cdef bool DEBUG = False
+cdef bool FRIEND_OF_FRIEND_ENABLED = False
 
 class FennelPartitioner():
 
     def __init__(self, alpha=None):
         if alpha:
             self.PREDICTION_MODEL_ALPHA = alpha
+        self.original_graph = None
 
     def get_votes(self, object graph, int node, int num_partitions, int[::] partition):
         global UNMAPPED
@@ -25,7 +27,10 @@ class FennelPartitioner():
         # calculate votes based on neighbors placed in partitions
         for right_node in node_neighbors:
             if partition[right_node] != UNMAPPED:
-                partition_votes[partition[right_node]] += graph.edge[node][right_node]['weight']
+                weight = graph.edge[node][right_node]['weight']
+                if weight <= 0.0:
+                    weight = 1.0
+                partition_votes[partition[right_node]] += weight
                 #partition_votes_nodes[partition[right_node]] += 1
 
         return partition_votes
@@ -117,22 +122,22 @@ class FennelPartitioner():
         single_nodes = []
         for node in graph.nodes_iter():
 
+            # Skip fixed nodes - check this first and move on if node has already been considered
+            if fixed[node] != UNMAPPED:
+                if DEBUG:
+                    print("Skipping node {}".format(node))
+                continue
+
             # Exclude single nodes, deal with these later
             neighbors = list(nx.all_neighbors(graph, node))
             if not neighbors:
                 single_nodes.append(node)
                 continue
 
-            # Skip fixed nodes
-            if fixed[node] != UNMAPPED:
-                if DEBUG:
-                    print("Skipping node {}".format(node))
-                continue
-
             partition_votes = self.get_votes(graph, node, num_partitions, assignments)
             assignments[node] = self.get_assignment(graph, node, num_partitions, assignments, partition_votes, alpha)
 
-        # Assign single nodes
+        # Assign single nodes that have no neighbors
         node = 0
         for node in single_nodes:
             if assignments[node] == UNMAPPED:
@@ -151,7 +156,135 @@ class FennelPartitioner():
 
         cdef int i = 0
 
+        current_batch = []
+        if FRIEND_OF_FRIEND_ENABLED:
+            current_batch = self.current_batch_nodes(graph, fixed)
+
         for i in range(num_iterations):
             assignments = self.fennel(graph, num_partitions, assignments, fixed, self.PREDICTION_MODEL_ALPHA)
 
+        if FRIEND_OF_FRIEND_ENABLED:
+            # compute improved assignment for everyone in the current batch that has no friends in a partition
+            self.friend_of_friend_lonely_node_partition_assignment(graph, num_partitions, current_batch, assignments, fixed)
+
         return np.asarray(assignments)
+
+    def current_batch_nodes(self, object graph, int [::] fixed):
+        '''
+        Returns the list of nodes in graph that currently haven't been assigned to any single partition just yet
+        '''
+        current_batch = []
+        cdef int node = 0
+        for node in graph.nodes_iter():
+            if fixed[node] == UNMAPPED:
+                current_batch.append(node)
+        return current_batch
+
+    def friend_of_friend_lonely_node_partition_assignment(self,
+                                  object graph,
+                                  int num_partitions,
+                                  list current_batch_nodes,
+                                  int [::] assignments,
+                                  int [::] fixed):
+        '''
+        This function determines the optimal partition for a node that is lonely, that has no.
+        '''
+
+        #print('STARTING friend_of_friend_lonely_node_partition_assignment')
+
+        # obtain list of friendless nodes
+        lonely_nodes = []
+        for node in current_batch_nodes:
+            # check how many friends are assigned to partitions for the current node and current subgraph
+            partition_scores = list(self.get_votes(graph, node, num_partitions, assignments))
+            if self.node_has_friends_in_partitions(partition_scores) == False:
+                # check if node has any edges at all in whole graph
+                lonely_nodes.append(node)
+
+        #print('lonely nodes:', lonely_nodes)
+
+        for lonely_node in lonely_nodes:
+            neighbors = []
+
+            if self.original_graph:
+                # use the full graph
+                neighbors = list(nx.all_neighbors(self.original_graph, lonely_node))
+            else:
+                neighbors = list(nx.all_neighbors(graph, lonely_node))
+
+            #print('lonely_node_neighbors', lonely_node, neighbors)
+
+            if len(neighbors) > 0:
+                # this is a single node, a random assignment is OK
+                #print('Found FENNEL node that has no friends in partitions, but that has some friends in network', lonely_node, neighbors)
+                friend_count_per_partition = {}
+                # check where these neighbors are more likely to end up
+                #cdef int neighbor = 0
+                # on a first pass over the neighbors, compute the total partition scores and move the lonely_node to that partition
+                total_neighbor_partition_scores = {}
+                neighbor_partition_scores = {}
+                original_partition = assignments[lonely_node]
+                assignments[lonely_node] = -1
+
+                for neighbor in neighbors:
+                    if fixed[neighbor] != UNMAPPED:
+                        continue # neighbor is in network - should never be the case
+
+                    if fixed[neighbor] != UNMAPPED:
+                        continue # neighbor is in network - should never be the case
+                    neighbor_partition_scores[neighbor] = self.get_votes(self.original_graph, neighbor, num_partitions, assignments)
+                    for i, score in enumerate(list(neighbor_partition_scores[neighbor])):
+                        if i in total_neighbor_partition_scores:
+                            total_neighbor_partition_scores[i] += score
+                        else:
+                            total_neighbor_partition_scores[i] = score
+
+                # move lonely node to partition with highest neighbor score
+                max_score = 0.0
+                max_score_partition = -1
+                for partition in total_neighbor_partition_scores.keys():
+                    if total_neighbor_partition_scores[partition] > max_score:
+                        max_score_partition = partition
+                        max_score = total_neighbor_partition_scores[partition]
+
+                # relocate node
+                if(max_score_partition >= 0):
+                    #print('relocating lonely_node', lonely_node, original_partition, max_score_partition, total_neighbor_partition_scores)
+                    assignments[lonely_node] = max_score_partition
+                else:
+                    assignments[lonely_node] = original_partition
+
+                for neighbor in neighbors:
+                    if fixed[neighbor] != UNMAPPED:
+                        continue # neighbor is in network - should never be the case
+                    #partition_scores = self.get_votes(self.original_graph, neighbor, num_partitions, assignments)
+                    if self.node_has_friends_in_partitions(list(neighbor_partition_scores[neighbor])) == True:
+                    #if self.node_has_friends_in_partitions(list(partition_scores)) == True:
+                        # this neighbor has at least one friend in any one of the partitions
+                        # determine in which partition this friend would end up
+                        partition = self.get_assignment(self.original_graph, neighbor, num_partitions, assignments, neighbor_partition_scores[neighbor], self.PREDICTION_MODEL_ALPHA)
+                        if partition in friend_count_per_partition:
+                            friend_count_per_partition[partition] += 1
+                        else:
+                            friend_count_per_partition[partition] = 1
+                    #print('friend', neighbor, list(partition_scores))
+                #print('lonely_node friend counts', lonely_node, friend_count_per_partition)
+                # relocate lonely_node based on friend_count_per_partition
+                max_count = 0
+                best_partition = -1
+                for partition in friend_count_per_partition.keys():
+                    if friend_count_per_partition[partition] > max_count:
+                        max_count = friend_count_per_partition[partition]
+                        best_partition = partition
+
+                if best_partition >= 0:
+                    #print('relocating lonely_node to best partition', lonely_node, max_count, best_partition)
+                    assignments[lonely_node] = best_partition
+
+    def node_has_friends_in_partitions(self, partition_scores):
+        sum_scores = 0.0
+        for score in partition_scores:
+            sum_scores += score
+        if sum_scores == 0.0:
+            return False # has no friends in any partition
+        return True # has some friends in at least one partition
