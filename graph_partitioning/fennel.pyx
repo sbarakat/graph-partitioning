@@ -187,7 +187,20 @@ class FennelPartitioner():
                                   int [::] assignments,
                                   int [::] fixed):
         '''
-        This function determines the optimal partition for a node that is lonely, that has no.
+        This function determines the optimal partition for a node that is lonely.
+
+1. for each fennel batch, I run fennel with all of its iterations, which produces the assignments
+2. once that is done, i make a list of nodes, from the latest batch that have just been assigned and from that list, I extract the nodes that have no friends in any of the partitions, the lonely_nodes list
+2.a the way the lonely nodes are found is: i call get_votes() from FENNEL, which, given a node, makes the sum of edge weights between that node and all nodes in each partition. so a partition with score 0.0 = a partition where this node has no edges, so if the sum of partition_votes = 0 across all partitions, then that node has no friends in any partition
+3. for each lonely node, i perform the following
+3.a find all the neighbours of that node, whether they have been assigned already or not, i then remove the neighbours that are already in a partition (a case that should never happen given 2a above)
+3.b for each neighbour, I compute the partition_scores for that neighbour, as if I were trying to assign it now, given the partition score, i remove any neighbour that has NO friends currently assigned by fennel
+3.c at this point, the neighbour has at least a friend in any partition, so I compute the FENNEL assignment, calling get_assignment() which assigns that node to their hypothetical partition
+3.d i store a count of where friends of the lonely node get partitioned: example 'lonely_node friend counts', 50, {2: 3, 0: 2}. This means that node 50 is a lonely_node and 3 of its friends have been assigned by fennel to partition 2 and 2 of its friends have been assigned to partition 0
+3.e at this point, I should relocate node 50 from its currently assigned partition, to partition 2
+
+MISSING: node relocation out of current assignment to find neighbor scores and then relocation after scores computed
+
         '''
 
         #print('STARTING friend_of_friend_lonely_node_partition_assignment')
