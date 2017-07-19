@@ -254,19 +254,16 @@ class GraphPartitioning:
         if graph == None:
             graph = self.G
 
+        # waste, cut_ratio
         x = utils.score(graph, self.assignments, self.num_partitions)
+
         edges_cut, steps, cut_edges = utils.base_metrics(graph, self.assignments)
 
         #q_qds_conductance = utils.louvainModularityComQuality(graph, self.assignments, self.num_partitions)
+        # non-overlapping metrics
         q_qds_conductance = utils.infomapModularityComQuality(graph, self.assignments, self.num_partitions)
 
-        #mod = 0
-        #try:
-        #    mod = utils.modularity_wavg(graph, self.assignments, self.num_partitions)
-        #except Exception as err:
-        #    pass
-
-        loneliness = utils.loneliness_score_wavg(graph, self.loneliness_score_param, self.assignments, self.num_partitions)
+        #loneliness = utils.loneliness_score_wavg(graph, self.loneliness_score_param, self.assignments, self.num_partitions)
         max_perm = utils.run_max_perm(graph)
 
         #nmi_score = nmi_metrics.nmi(np.array([self.assignments_prediction_model, self.assignments]))
@@ -284,25 +281,24 @@ class GraphPartitioning:
                 pred_nmi_assignments.append(pred_assignments[i])
                 actual_nmi_assignments.append(partition)
 
-        #print("nmi_assignments", nmi_assignments)
-
-        #nmi_score = normalized_mutual_info_score(self.assignments_prediction_model.tolist(), nmi_assignments)
         nmi_score = normalized_mutual_info_score(pred_nmi_assignments, actual_nmi_assignments)
 
         # compute the sum of edge weights for all the cut edges for a total score
-        total_cut_weight = 0
-        for cutEdge in cut_edges:
-            total_cut_weight += self.originalG.edge[cutEdge[0]][cutEdge[1]]['weight']
+        #total_cut_weight = 0
+        #for cutEdge in cut_edges:
+        #    total_cut_weight += self.originalG.edge[cutEdge[0]][cutEdge[1]]['weight']
 
         # compute fscores
         fscore, fscore_relabelled = utils.fscores2(self.assignments_prediction_model, self.assignments, self.num_partitions)
         #print('fscores:', fscore, fscore_relabelled)
 
         if self.verbose > 1:
-            print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4:.5f}\t{5:.5f}\t{6:.5f}\t{7}\t{8}\t{9:.10f}\t{10}\t{11}\t{12}".format(x[0], x[1], edges_cut, steps, q_qds_conductance[0], q_qds_conductance[1], q_qds_conductance[2], loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)))
+            print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4:.5f}\t{5:.5f}\t{6}\t{7:.10f}\t{8}\t{9}".format(x[0], x[1], edges_cut, steps, q_qds_conductance[1], q_qds_conductance[2], max_perm, nmi_score, fscore, abs(fscore-fscore_relabelled)))
+            #print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4:.5f}\t{5:.5f}\t{6:.5f}\t{7}\t{8}\t{9:.10f}\t{10}\t{11}\t{12}".format(x[0], x[1], edges_cut, steps, q_qds_conductance[0], q_qds_conductance[1], q_qds_conductance[2], loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)))
             #print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4}\t{5}\t{6}\t{7:.10f}\t{8}\t{9}\t{10}".format(x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)))
 
-        return [x[0], x[1], edges_cut, steps, q_qds_conductance[0], q_qds_conductance[1], q_qds_conductance[2], loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)]
+        return [x[0], x[1], edges_cut, steps, q_qds_conductance[1], q_qds_conductance[2], max_perm, nmi_score, fscore, abs(fscore-fscore_relabelled)]
+        #return [x[0], x[1], edges_cut, steps, q_qds_conductance[0], q_qds_conductance[1], q_qds_conductance[2], loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)]
         #return [x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)]
 
     def assign_cut_off(self):
