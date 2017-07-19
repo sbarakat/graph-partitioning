@@ -239,6 +239,7 @@ def infomapModularityComQuality(G, assignments, num_partitions):
     #print('infomapModularityComQuality dir', temp_dir)
 
     partition_metrics = [0.0, 0.0, 0.0]
+    total_nodes = 0
 
     for p in range(0, num_partitions):
         #print('partition', p)
@@ -291,19 +292,24 @@ def infomapModularityComQuality(G, assignments, num_partitions):
                 args, cwd=com_qual_path,
                 stdout=logwriter, stderr=subprocess.STDOUT)
 
+        n_nodes = len(nodes)
+        total_nodes = total_nodes + n_nodes
         # return metrics
         with open(com_qual_log, "r") as fp:
             metrics = {}
             for line in fp:
                 m = [p.strip() for p in line.split(',')]
                 metrics.update(dict(map(lambda y:y.split(' = '), m)))
-            partition_metrics[0] += float(metrics['Q'])
-            partition_metrics[1] += float(metrics['Qds'])
-            partition_metrics[2] += float(metrics['conductance'])
+            partition_metrics[0] += float(metrics['Q']) * (1.0 * n_nodes)
+            partition_metrics[1] += float(metrics['Qds']) * (1.0 * n_nodes)
+            partition_metrics[2] += float(metrics['conductance']) * (1.0 * n_nodes)
 
-    partition_metrics[0] = partition_metrics[0] / (1.0 * num_partitions)
-    partition_metrics[1] = partition_metrics[1] / (1.0 * num_partitions)#4.0
-    partition_metrics[2] = partition_metrics[2] / (1.0 * num_partitions)#4.0
+    partition_metrics[0] = partition_metrics[0] / (1.0 * total_nodes)
+    partition_metrics[1] = partition_metrics[1] / (1.0 * total_nodes)#4.0
+    partition_metrics[2] = partition_metrics[2] / (1.0 * total_nodes)#4.0
+    #partition_metrics[0] = partition_metrics[0] / (1.0 * num_partitions)
+    #partition_metrics[1] = partition_metrics[1] / (1.0 * num_partitions)#4.0
+    #partition_metrics[2] = partition_metrics[2] / (1.0 * num_partitions)#4.0
 
     shutil.rmtree(temp_dir)
 
