@@ -438,10 +438,13 @@ class GraphPartitioning:
     def process_batch(self, batch_arrived, assign_all=False):
         # re-order batch_arrived using a FENNEL re-ordering algorithm, if required and configured to do so
         # TODO add configuration for this
-        if self.PARTITIONER_ALGORITHM == 'FENNEL' and self.FENNEL_NODE_REORDERING_ENABLED:
-            reordered_batch = utils.reorder_nodes_based_on_leverage_centrality(self.fennel_centrality_reordered_nodes, batch_arrived)
-            #print('batch reordering', batch_arrived, reordered_batch)
-            batch_arrived = reordered_batch
+        if self.PARTITIONER_ALGORITHM == 'FENNEL':
+            if self.FENNEL_NODE_REORDERING_ENABLED:
+                reordered_batch = utils.reorder_nodes_based_on_leverage_centrality(self.fennel_centrality_reordered_nodes, batch_arrived)
+                #print('batch reordering', batch_arrived, reordered_batch)
+                batch_arrived = reordered_batch
+            else:
+                batch_arrived = batch_arrived[::-1]
 
         # GRAPH MODIFICATION FUNCTIONS
         if self.graph_modification_functions:
