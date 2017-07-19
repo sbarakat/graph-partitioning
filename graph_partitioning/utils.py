@@ -581,6 +581,32 @@ def loneliness_score_wavg(G, loneliness_score_param, assignments, num_partitions
     #return np.average(partition_score, weights=partition_population)
     return average
 
+def wavg_max_perm(G, assignments, num_partitions):
+    partition_nodes = {}
+    for node in G.nodes():
+        assignment = assignments[node]
+        if assignment >= 0 and assignment < num_partitions:
+            if assignment in partition_nodes:
+                partition_nodes[assignment].append(node)
+            else:
+                partition_nodes[assignment] = [node]
+    score = 0.0
+    total = 0
+    for partition in partition_nodes.keys():
+        gsub = G.subgraph(partition_nodes[partition])
+        n_nodes = len(partition_nodes[partition])
+
+        partition_max_perm = float(run_max_perm(gsub))
+        #print('pmp', partition_max_perm)
+        partition_max_perm = n_nodes * partition_max_perm
+        score = score + partition_max_perm
+
+        #score += (n_nodes * float())
+        total += n_nodes
+
+    if total > 0:
+        return score / total
+    return 0.0
 
 def run_max_perm(G, relabel_nodes=False):
     max_perm = 0.0

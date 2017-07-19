@@ -264,7 +264,8 @@ class GraphPartitioning:
         q_qds_conductance = utils.infomapModularityComQuality(graph, self.assignments, self.num_partitions)
 
         #loneliness = utils.loneliness_score_wavg(graph, self.loneliness_score_param, self.assignments, self.num_partitions)
-        max_perm = utils.run_max_perm(graph)
+        #max_perm = utils.run_max_perm(graph)
+        max_perm = utils.wavg_max_perm(graph, self.assignments, self.num_partitions)
 
         #nmi_score = nmi_metrics.nmi(np.array([self.assignments_prediction_model, self.assignments]))
         nmi_assignments = self.assignments.tolist()
