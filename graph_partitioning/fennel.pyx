@@ -14,6 +14,7 @@ class FennelPartitioner():
             self.PREDICTION_MODEL_ALPHA = alpha
         self.original_graph = None
         self.FENNEL_FRIEND_OF_A_FRIEND_ENABLED = FRIEND_OF_FRIEND_ENABLED
+        self.batch_node_order = []
 
     def get_votes(self, object graph, int node, int num_partitions, int[::] partition):
         global UNMAPPED
@@ -159,7 +160,10 @@ class FennelPartitioner():
 
         current_batch = []
         if self.FENNEL_FRIEND_OF_A_FRIEND_ENABLED:
-            current_batch = self.current_batch_nodes(graph, fixed)
+            current_batch = self.batch_node_order
+            current_batch_n = self.current_batch_nodes(graph, fixed)
+            if(len(current_batch_n) != len(current_batch)):
+                current_batch = current_batch_n
 
         for i in range(num_iterations):
             assignments = self.fennel(graph, num_partitions, assignments, fixed, self.PREDICTION_MODEL_ALPHA)

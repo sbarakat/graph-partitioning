@@ -481,6 +481,7 @@ class GraphPartitioning:
             nodes_fixed = len([o for o in self.fixed if o == 1])
             alpha = (edges_arrived) * (self.num_partitions / (nodes_fixed + len(batch_arrived))**2)
             self.partition_algorithm.PREDICTION_MODEL_ALPHA = alpha
+            self.batch_node_order = batch_arrived
 
         if self.alter_node_weight_to_gam_prediction:
             # justification: the gam learns the entire population, so run fennal on entire population
