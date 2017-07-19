@@ -97,12 +97,12 @@ class GraphPartitioning:
             from graph_partitioning import fennel
 
             if self.PREDICTION_MODEL_ALGORITHM == 'FENNEL':
-                self.prediction_model_algorithm = fennel.FennelPartitioner(self.prediction_model_alpha)
+                self.prediction_model_algorithm = fennel.FennelPartitioner(self.prediction_model_alpha, self.FENNEL_FRIEND_OF_A_FRIEND_ENABLED)
                 if self.verbose > 0:
                     print("FENNEL partitioner loaded for generating PREDICTION MODEL.")
 
             if self.PARTITIONER_ALGORITHM == 'FENNEL':
-                self.partition_algorithm = fennel.FennelPartitioner()
+                self.partition_algorithm = fennel.FennelPartitioner(FRIEND_OF_FRIEND_ENABLED=self.FENNEL_FRIEND_OF_A_FRIEND_ENABLED)
                 if self.verbose > 0:
                     print("FENNEL partitioner loaded for making shelter assignments.")
 

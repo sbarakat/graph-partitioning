@@ -5,14 +5,15 @@ from utils import bincount_assigned, score
 
 cdef int UNMAPPED = -1
 cdef bool DEBUG = False
-cdef bool FRIEND_OF_FRIEND_ENABLED = False
+#cdef bool FRIEND_OF_FRIEND_ENABLED = False
 
 class FennelPartitioner():
 
-    def __init__(self, alpha=None):
+    def __init__(self, alpha=None, FRIEND_OF_FRIEND_ENABLED=False):
         if alpha:
             self.PREDICTION_MODEL_ALPHA = alpha
         self.original_graph = None
+        self.FENNEL_FRIEND_OF_A_FRIEND_ENABLED = FRIEND_OF_FRIEND_ENABLED
 
     def get_votes(self, object graph, int node, int num_partitions, int[::] partition):
         global UNMAPPED
@@ -157,13 +158,13 @@ class FennelPartitioner():
         cdef int i = 0
 
         current_batch = []
-        if FRIEND_OF_FRIEND_ENABLED:
+        if self.FENNEL_FRIEND_OF_A_FRIEND_ENABLED:
             current_batch = self.current_batch_nodes(graph, fixed)
 
         for i in range(num_iterations):
             assignments = self.fennel(graph, num_partitions, assignments, fixed, self.PREDICTION_MODEL_ALPHA)
 
-        if FRIEND_OF_FRIEND_ENABLED:
+        if self.FENNEL_FRIEND_OF_A_FRIEND_ENABLED:
             # compute improved assignment for everyone in the current batch that has no friends in a partition
             self.friend_of_friend_lonely_node_partition_assignment(graph, num_partitions, current_batch, assignments, fixed)
 
@@ -240,9 +241,6 @@ MISSING: node relocation out of current assignment to find neighbor scores and t
                 assignments[lonely_node] = -1
 
                 for neighbor in neighbors:
-                    if fixed[neighbor] != UNMAPPED:
-                        continue # neighbor is in network - should never be the case
-
                     if fixed[neighbor] != UNMAPPED:
                         continue # neighbor is in network - should never be the case
                     neighbor_partition_scores[neighbor] = self.get_votes(self.original_graph, neighbor, num_partitions, assignments)
