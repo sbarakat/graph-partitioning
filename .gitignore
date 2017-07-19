@@ -8,6 +8,7 @@ output/
 *.class
 
 PaToH.log.*
+oslo_network_h
 
 config.py
 data/PaToH.log.*
