@@ -636,6 +636,7 @@ def run_community_metrics(output_path, data_filename, edges_oslom_filename):
     Use OSLOM to find clusters in edgelist, then run ComQualityMetric to get metrics.
 
     http://www.oslom.org/
+    http://www.oslom.org/code/ReadMe.pdf for documentation on program options
     https://github.com/chenmingming/ComQualityMetric
     """
     temp_dir = ''
@@ -655,7 +656,7 @@ def run_community_metrics(output_path, data_filename, edges_oslom_filename):
         oslom_modules = os.path.join('output', 'oslom', data_filename + "-oslom-tp.txt")
         edges_oslom_filename = os.path.join('output', 'oslom', data_filename + "-edges-oslom.txt")
 
-    args = [oslom_bin, "-f", edges_oslom_filename, "-w", "-r", "10", "-hr", "50"]
+    args = [oslom_bin, "-f", edges_oslom_filename, "-w", "-r", "10", "-hr", "50", "-infomap", "5"]
 
     if 'Linux' in platform.system():
         with open(oslom_log, "w") as logwriter:
