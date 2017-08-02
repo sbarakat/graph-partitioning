@@ -304,9 +304,14 @@ def infomapModularityComQuality(G, assignments, num_partitions):
             partition_metrics[1] += float(metrics['Qds']) * (1.0 * n_nodes)
             partition_metrics[2] += float(metrics['conductance']) * (1.0 * n_nodes)
 
-    partition_metrics[0] = partition_metrics[0] / (1.0 * total_nodes)
-    partition_metrics[1] = partition_metrics[1] / (1.0 * total_nodes)#4.0
-    partition_metrics[2] = partition_metrics[2] / (1.0 * total_nodes)#4.0
+    if total_nodes:
+        partition_metrics[0] = partition_metrics[0] / (1.0 * total_nodes)
+        partition_metrics[1] = partition_metrics[1] / (1.0 * total_nodes)#4.0
+        partition_metrics[2] = partition_metrics[2] / (1.0 * total_nodes)#4.0
+    else:
+        partition_metrics[0] = 0.0
+        partition_metrics[1] = 0.0
+        partition_metrics[2] = 0.0
     #partition_metrics[0] = partition_metrics[0] / (1.0 * num_partitions)
     #partition_metrics[1] = partition_metrics[1] / (1.0 * num_partitions)#4.0
     #partition_metrics[2] = partition_metrics[2] / (1.0 * num_partitions)#4.0
