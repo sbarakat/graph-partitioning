@@ -77,16 +77,31 @@ class PatohPartitioner():
             _assignments = self._runPartitioning(G, num_partitions, patoh_assignments, nodeMapping, assignments)
             self.runAssignments[i] = _assignments
             edges_cut, steps, cut_edges = gputils.base_metrics(graph, _assignments)
-            if edges_cut not in list(iterations.keys()):
-                iterations[edges_cut] = _assignments
+
+            #change to TCV
+            if steps not in list(iterations.keys()):
+                iterations[steps] = _assignments
+
+            #if edges_cut not in list(iterations.keys()):
+            #    iterations[edges_cut] = _assignments
+
+        # return the maximum TCV
+        minTCV = 1000000000
+        for key in list(iterations.keys()):
+            if key < minTCV:
+                minTCV = key
+
+        assignments = iterations[minTCV]
 
         # return the minimum edges cut
+        '''
         minEdgesCut = graph.number_of_edges()
         for key in list(iterations.keys()):
             if key < minEdgesCut:
                 minEdgesCut = key
 
         assignments = iterations[minEdgesCut]
+        '''
 
         self._printIterationStats(iterations)
         del iterations
@@ -145,16 +160,32 @@ class PatohPartitioner():
             _assignments = self._runPartitioning(G, num_partitions, patoh_assignments, node_indeces, assignments)
             # compute the edges cut
             edges_cut, steps = gputils.base_metrics(graph, _assignments)
-            if edges_cut not in list(iterations.keys()):
-                iterations[edges_cut] = _assignments
+
+            #change to TCV
+            if steps not in list(iterations.keys()):
+                iterations[steps] = _assignments
+
+            #if edges_cut not in list(iterations.keys()):
+            #    iterations[edges_cut] = _assignments
+
+        # return the maximum TCV
+        maxTCV = 0.0
+        for key in list(iterations.keys()):
+            if key > maxTCV:
+                maxTCV = key
+
+        print('max_tcv', maxTCV)
+        assignments = iterations[maxTCV]
 
         # return the minimum edges cut
+        '''
         minEdgesCut = graph.number_of_edges()
         for key in list(iterations.keys()):
             if key < minEdgesCut:
                 minEdgesCut = key
 
         assignments = iterations[minEdgesCut]
+        '''
 
         self._printIterationStats(iterations)
         del iterations
@@ -214,15 +245,26 @@ class PatohPartitioner():
     def _printIterationStats(self, iterations):
         if self._quiet == False:
 
-            min_cuts = 1000000000
-            max_cuts = 0
+            max_TCV = 0
+            min_TCV = 1000000000
 
+            #min_cuts = 1000000000
+            #max_cuts = 0
+
+            for TCV in list(iterations.keys()):
+                if TCV < min_TCV:
+                    min_TCV = TCV
+                if TCV > max_TCV:
+                    max_TCV = TCV
+            print('Ran PaToH for', self.partitioningIterations, 'iterations with min_tcv =', min_TCV, 'and max_tcv =', max_TCV, ' - picked min_TCV assignements.')
+            '''
             for cuts in list(iterations.keys()):
                 if cuts < min_cuts:
                     min_cuts = cuts
                 if cuts > max_cuts:
                     max_cuts = cuts
             print('Ran PaToH for', self.partitioningIterations, 'iterations with min_cuts =', min_cuts, 'and max_cuts =', max_cuts, ' - picked min_cuts assignements.')
+            '''
 
     def _createGraphIndeces(self, graphNodes, originalNodeNum):
         '''

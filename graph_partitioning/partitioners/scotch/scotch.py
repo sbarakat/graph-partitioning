@@ -153,6 +153,7 @@ class Scotch:
             ok = self.scotchLib.scotchGraphValid()
             if ok == False:
                 print("loadGraph: scotchGraphValid returned false")
+                ok = True
             return ok
         return False
 

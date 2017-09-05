@@ -34,6 +34,12 @@ class GraphPartitioning:
 
         self.compute_output_filenames()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *err):
+        pass
+
     def load_network(self):
         # read METIS file
         self.G = utils.read_metis(self.DATA_FILENAME)
@@ -127,7 +133,7 @@ class GraphPartitioning:
             if self.PARTITIONER_ALGORITHM == 'SCOTCH':
                 # use the same prediction_model_algorithm for both batch and prediction modes
                 self.partition_algorithm = self.prediction_model_algorithm
-                if not self._quiet:
+                if self.verbose > 0:
                     print("SCOTCH partitioner loaded for making shelter assignments.")
 
         if self.PREDICTION_MODEL_ALGORITHM == 'PATOH':
@@ -263,7 +269,8 @@ class GraphPartitioning:
         # non-overlapping metrics
         q_qds_conductance = utils.infomapModularityComQuality(graph, self.assignments, self.num_partitions)
 
-        #loneliness = utils.loneliness_score_wavg(graph, self.loneliness_score_param, self.assignments, self.num_partitions)
+        loneliness = utils.loneliness_score_wavg(graph, self.loneliness_score_param, self.assignments, self.num_partitions)
+        #print('loneliness', loneliness)
         #max_perm = utils.run_max_perm(graph)
         max_perm = utils.wavg_max_perm(graph, self.assignments, self.num_partitions)
 
@@ -294,11 +301,11 @@ class GraphPartitioning:
         #print('fscores:', fscore, fscore_relabelled)
 
         if self.verbose > 1:
-            print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4:.5f}\t{5:.5f}\t{6}\t{7:.10f}\t{8}\t{9}".format(x[0], x[1], edges_cut, steps, q_qds_conductance[1], q_qds_conductance[2], max_perm, nmi_score, fscore, abs(fscore-fscore_relabelled)))
+            print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4:.5f}\t{5:.5f}\t{6}\t{7:.10f}\t{8}\t{9}\t{10:.5f}".format(x[0], x[1], edges_cut, steps, q_qds_conductance[1], q_qds_conductance[2], max_perm, nmi_score, fscore, abs(fscore-fscore_relabelled), loneliness))
             #print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4:.5f}\t{5:.5f}\t{6:.5f}\t{7}\t{8}\t{9:.10f}\t{10}\t{11}\t{12}".format(x[0], x[1], edges_cut, steps, q_qds_conductance[0], q_qds_conductance[1], q_qds_conductance[2], loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)))
             #print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4}\t{5}\t{6}\t{7:.10f}\t{8}\t{9}\t{10}".format(x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)))
 
-        return [x[0], x[1], edges_cut, steps, q_qds_conductance[1], q_qds_conductance[2], max_perm, nmi_score, fscore, abs(fscore-fscore_relabelled)]
+        return [x[0], x[1], edges_cut, steps, q_qds_conductance[1], q_qds_conductance[2], max_perm, nmi_score, fscore, abs(fscore-fscore_relabelled), loneliness]
         #return [x[0], x[1], edges_cut, steps, q_qds_conductance[0], q_qds_conductance[1], q_qds_conductance[2], loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)]
         #return [x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)]
 
@@ -364,9 +371,35 @@ class GraphPartitioning:
                 # this may due to the fact that virtual nodes have no original weight
                 pass
 
+            w1 = float(G.node[left]['weight'])
+            w2 = float(G.node[right]['weight'])
 
-            # new edge weight
-            edge[2]['weight'] = (float(G.node[left]['weight']) * edge_weight) * (float(G.node[right]['weight']) * edge_weight)
+            # edge expansion
+            if self.EDGE_EXPANSION_MODE == 'minimum':
+                if w1 < w2:
+                    edge[2]['weight'] = w1
+                else:
+                    edge[2]['weight'] = w2
+            elif self.EDGE_EXPANSION_MODE == 'maximum':
+                if w1 < w2:
+                    edge[2]['weight'] = w2
+                else:
+                    edge[2]['weight'] = w1
+            elif self.EDGE_EXPANSION_MODE == 'product':
+                edge[2]['weight'] = w1 * w2
+            elif self.EDGE_EXPANSION_MODE == 'product_squared':
+                edge[2]['weight'] = (w1 * w2) ** 2
+            elif self.EDGE_EXPANSION_MODE == 'sqrt_product':
+                edge[2]['weight'] = (w1 * w2) ** 0.5
+            elif self.EDGE_EXPANSION_MODE == 'average':
+                edge[2]['weight'] = (w1 + w2) * 0.5
+            elif self.EDGE_EXPANSION_MODE == 'total':
+                edge[2]['weight'] = w1 + w2
+            else:
+                # new edge weight
+                edge[2]['weight'] = (float(G.node[left]['weight']) * edge_weight) * (float(G.node[right]['weight']) * edge_weight)
+
+            #print('edge_weight', self.EDGE_EXPANSION_MODE, w1, w2, edge[2]['weight'])
 
             if left in self.nodes_arrived or right in self.nodes_arrived:
                 # change the emphasis of the prediction model
