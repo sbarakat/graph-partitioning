@@ -256,6 +256,12 @@ def infomapModularityComQuality(G, assignments, num_partitions):
         with open(network_path, 'w+') as f:
             # write node_id other_node_id edge_weight
             for node in sorted_nodes:
+
+                try:
+                    neighs = Gsub.neighbors(node)
+                except Exception as e:
+                    print('Gsub neighbors error: node, nodes, sorted_nodes Gsub.nodes()', node, nodes, sorted_nodes, Gsub.nodes(), G.nodes())
+
                 for neighbor in Gsub.neighbors(node):
                     weight = 1
                     try:
@@ -873,7 +879,10 @@ def fscores2(predictionModel, assignments, num_partitions):
     prediction = np.array(pm)
     batch = np.array(btch)
 
+    #print('computing fscores', len(prediction), len(batch))
+
     fscore = f1_score(prediction, batch, average='weighted')
+    #fscore = 0.0
 
     fscorematrix = []
     for i in range(0, num_partitions):
@@ -881,6 +890,8 @@ def fscores2(predictionModel, assignments, num_partitions):
         fi_correct = []
         for j in range(0, num_partitions):
             batch_ij = relabelArray(batch, i, j)
+            #fi.append(1.0 - 0.0)
+            #print("fmatrix", len(prediction), len(batch_ij))
             fi.append(1.0 - f1_score(prediction, batch_ij, average='weighted'))
         fscorematrix.append(fi)
 
@@ -907,7 +918,9 @@ def fscores2(predictionModel, assignments, num_partitions):
             relabel_done[row] = col
         relabelled_batch = relabelArray(relabelled_batch, row, col_ind[i])
 
+    #print("computing fscores relabelled", len(prediction), len(relabelled_batch))
     fscore_relabelled = f1_score(prediction, relabelled_batch, average='weighted')
+    #fscore_relabelled = 0.0
     return(fscore, fscore_relabelled)
 
 def fscores(predictionModel, assignments, num_partitions):
@@ -1063,3 +1076,63 @@ def infomapCommunityDetection(graph):
             else:
                 communities[community] = [node_id]
     return communities;
+
+def ratherBeSomewhereElseMetric(RBSE_list):
+    total = 0
+    rbse = 0
+    for i, val in enumerate(RBSE_list):
+        if val < 0:
+            continue
+        if val == 1:
+            rbse += 1
+        total += 1
+
+    if total == 0:
+        return 0.0
+    else:
+        return (float(rbse) / float(total))
+
+def ratherBeSomewhereElseList(graph, assignments, num_partitions):
+    RBSE = np.zeros(len(assignments), dtype=int).tolist()
+
+    for nodeID, assignment in enumerate(assignments):
+        if assignment < 0:
+            RBSE[nodeID] = -1
+            continue
+
+        neighbors = graph.neighbors(nodeID)
+
+        # initialise partition scores
+        partition_scores = {}
+        for i in range(0, num_partitions):
+            partition_scores[i] = 0
+
+        # analyse the partition of each neighbor
+        for neighbor in neighbors:
+            neighbor_assignment = assignments[neighbor]
+
+            edge_weight = 1.0
+            try:
+                edge_weight = graph.get_edge_data(nodeID, neighbor)['weight']
+            except Exception as err:
+                pass
+
+            if neighbor_assignment >= 0:
+                partition_scores[neighbor_assignment] += edge_weight
+
+        current_partition_score = partition_scores[assignment]
+
+        for partition in partition_scores.keys():
+            score = partition_scores[partition]
+
+            if partition != assignment:
+                if score > current_partition_score:
+                    RBSE[nodeID] = 1
+                    break
+    return RBSE
+
+
+def savePredictionFile(outFilePath, assignments):
+    with open(outFilePath, 'w+') as f:
+        for partition in assignments:
+            f.write(str(partition) + '\n')

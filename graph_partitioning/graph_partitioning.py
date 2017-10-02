@@ -48,6 +48,9 @@ class GraphPartitioning:
         # Alpha value used in prediction model
         self.prediction_model_alpha = self.G.number_of_edges() * (self.num_partitions / self.G.number_of_nodes()**2)
 
+        if self.use_one_shot_alpha:
+            self.prediction_model_alpha = self.one_shot_alpha
+
         # Order of nodes arriving
         self.arrival_order = list(range(0, self.G.number_of_nodes()))
 
@@ -196,6 +199,7 @@ class GraphPartitioning:
         if self.PREDICTION_MODEL:
             with open(self.PREDICTION_MODEL, "r") as inf:
                 self.assignments = np.fromiter(inf.readlines(), dtype=np.int32)
+                self.assignments_prediction_model = np.array(self.assignments, copy=True)
         else:
             if self.graph_modification_functions:
                 self.G = self._edge_expansion(self.G)
@@ -257,6 +261,9 @@ class GraphPartitioning:
             utils.fixed_width_print(self.assignments)
 
     def _print_score(self, graph=None):
+        if self.compute_metrics_enabled == False:
+            return [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
         if graph == None:
             graph = self.G
 
@@ -274,6 +281,9 @@ class GraphPartitioning:
         #max_perm = utils.run_max_perm(graph)
         max_perm = utils.wavg_max_perm(graph, self.assignments, self.num_partitions)
 
+        rbse_list = utils.ratherBeSomewhereElseList(graph, self.assignments, self.num_partitions)
+        rbse = utils.ratherBeSomewhereElseMetric(rbse_list)
+
         #nmi_score = nmi_metrics.nmi(np.array([self.assignments_prediction_model, self.assignments]))
         nmi_assignments = self.assignments.tolist()
         pred_assignments = self.assignments_prediction_model.tolist()
@@ -289,7 +299,10 @@ class GraphPartitioning:
                 pred_nmi_assignments.append(pred_assignments[i])
                 actual_nmi_assignments.append(partition)
 
+        #print('computing nmi', len(pred_nmi_assignments), len(actual_nmi_assignments))
+
         nmi_score = normalized_mutual_info_score(pred_nmi_assignments, actual_nmi_assignments)
+        #nmi_score = 0.0
 
         # compute the sum of edge weights for all the cut edges for a total score
         #total_cut_weight = 0
@@ -297,15 +310,18 @@ class GraphPartitioning:
         #    total_cut_weight += self.originalG.edge[cutEdge[0]][cutEdge[1]]['weight']
 
         # compute fscores
+        #print('computing fscore...')
         fscore, fscore_relabelled = utils.fscores2(self.assignments_prediction_model, self.assignments, self.num_partitions)
+        #fscore = 0.0
+        #fscore_relabelled = 0.0
         #print('fscores:', fscore, fscore_relabelled)
 
         if self.verbose > 1:
-            print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4:.5f}\t{5:.5f}\t{6}\t{7:.10f}\t{8}\t{9}\t{10:.5f}".format(x[0], x[1], edges_cut, steps, q_qds_conductance[1], q_qds_conductance[2], max_perm, nmi_score, fscore, abs(fscore-fscore_relabelled), loneliness))
+            print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4:.5f}\t{5:.5f}\t{6}\t{7:.5f}\t{8:.10f}\t{9}\t{10}\t{11:.5f}".format(x[0], x[1], edges_cut, steps, q_qds_conductance[1], q_qds_conductance[2], max_perm, rbse, nmi_score, fscore, abs(fscore-fscore_relabelled), loneliness))
             #print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4:.5f}\t{5:.5f}\t{6:.5f}\t{7}\t{8}\t{9:.10f}\t{10}\t{11}\t{12}".format(x[0], x[1], edges_cut, steps, q_qds_conductance[0], q_qds_conductance[1], q_qds_conductance[2], loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)))
             #print("{0:.5f}\t\t{1:.10f}\t{2}\t\t{3}\t\t\t{4}\t{5}\t{6}\t{7:.10f}\t{8}\t{9}\t{10}".format(x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)))
 
-        return [x[0], x[1], edges_cut, steps, q_qds_conductance[1], q_qds_conductance[2], max_perm, nmi_score, fscore, abs(fscore-fscore_relabelled), loneliness]
+        return [x[0], x[1], edges_cut, steps, q_qds_conductance[1], q_qds_conductance[2], max_perm, rbse, nmi_score, fscore, abs(fscore-fscore_relabelled), loneliness]
         #return [x[0], x[1], edges_cut, steps, q_qds_conductance[0], q_qds_conductance[1], q_qds_conductance[2], loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)]
         #return [x[0], x[1], edges_cut, steps, mod, loneliness, max_perm, nmi_score, total_cut_weight, fscore, abs(fscore-fscore_relabelled)]
 
@@ -516,6 +532,10 @@ class GraphPartitioning:
         if self.PARTITIONER_ALGORITHM == 'FENNEL':
             nodes_fixed = len([o for o in self.fixed if o == 1])
             alpha = (edges_arrived) * (self.num_partitions / (nodes_fixed + len(batch_arrived))**2)
+
+            if self.use_one_shot_alpha:
+                alpha = self.one_shot_alpha
+
             self.partition_algorithm.PREDICTION_MODEL_ALPHA = alpha
             self.batch_node_order = batch_arrived
 
@@ -526,6 +546,7 @@ class GraphPartitioning:
                                                                 self.num_partitions,
                                                                 self.assignments,
                                                                 self.fixed)
+
         else:
             # use the information we have, those that arrived
             self.assignments = self.partition_algorithm.generate_prediction_model(Gsub,
@@ -545,6 +566,15 @@ class GraphPartitioning:
             for n in batch_arrived:
                 self.fixed[n] = 1
                 self.nodes_arrived.append(n)
+
+        if self.alter_node_weight_to_gam_prediction:
+            # if GAM enabled, self.assignments has everyone who hasn't arrived yet partitioned, which is wrong for computing metrics
+            # therefore, whoever hasn't arrived should be un-partitioned after GAM prediction model is computed earlier
+            # if node is not fixed, then they haven't arrived, so we set their assignment back to -1
+            for i in range(0, len(self.assignments)):
+                # for each node, if not fixed, set assignment to -1
+                if self.fixed[i] != 1:
+                    self.assignments[i] = -1
 
         return [self._print_score(Gsub)]
 
