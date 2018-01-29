@@ -31,6 +31,7 @@ class GraphPartitioning:
             self._quiet = True
 
         self.originalG = None
+        self._batches = []
 
         self.compute_output_filenames()
 
@@ -40,9 +41,19 @@ class GraphPartitioning:
     def __exit__(self, *err):
         pass
 
+    def __del__(self):
+        self.lonelyNodeModifier = None
+
     def load_network(self):
+        self.lonelyNodeModifier = utils.LonelyNodesModifier(self, 0.2, 'after', isEnabled=True)
+
         # read METIS file
         self.G = utils.read_metis(self.DATA_FILENAME)
+
+        # Inject here additional lonely nodes
+        #num_lonely = utils.add_lonely_nodes_to_graph(self.G, 0.2)
+        #num_lonely = 0
+
         self.initial_number_of_nodes = self.G.number_of_nodes() # used for computing metrics
 
         # Alpha value used in prediction model
@@ -60,6 +71,20 @@ class GraphPartitioning:
         else:
             with open(self.SIMULATED_ARRIVAL_FILE, "r") as ar:
                 self.simulated_arrival_list = [int(line.rstrip('\n')) for line in ar]
+
+        #if num_lonely > 0:
+        #    arrivals = []
+        #    for i in range(0, num_lonely):
+        #        arrivals.append(1)
+        #    before = True
+        #    if before:
+        #        self.simulated_arrival_list = arrivals + self.simulated_arrival_list
+        #    else:
+        #        self.simulated_arrival_list = self.simulated_arrival_list + arrivals
+
+        self.lonelyNodeModifier.generateLonelyNodes()
+        self.lonelyNodeModifier.setLonelyCoordinates()
+        #print(self.lonelyNodeModifier.coordPath)
 
         # count the number of people arriving in the simulation
         self.number_simulated_arrivals = 0
@@ -116,8 +141,18 @@ class GraphPartitioning:
                     print("FENNEL partitioner loaded for making shelter assignments.")
 
             if self.FENNEL_NODE_REORDERING_ENABLED:
-                # compute the node leverage centrality scores for the whole graph
-                self.fennel_centrality_reordered_nodes = utils.leverage_centrality(self.G)
+                if self.FENNEL_NODE_REODERING_SCHEME == 'PII_LH':
+                    # compute the node leverage centrality scores for the whole graph
+                    self.fennel_centrality_reordered_nodes = utils.piiNodeOrder(self.G, self.G.nodes())
+                elif self.FENNEL_NODE_REODERING_SCHEME == 'LEVERAGE_HL':
+                    # compute the node leverage centrality scores for the whole graph
+                    self.fennel_centrality_reordered_nodes = utils.leverage_centrality(self.G, lonely_at_end=False)
+                elif self.FENNEL_NODE_REODERING_SCHEME == 'DEGREE_HL':
+                    self.fennel_centrality_reordered_nodes = utils.degree_centrality(self.G)
+                #elif self.FENNEL_NODE_REORDERING_SCHEME == 'BOTTLENECK_HL':
+                # for bottleneck, we must reorder just one batch at a time, not the whole network, because it is extremely slow!
+                #    self.fennel_centrality_reordered_nodes = utils.bottleneck_node_ordering(self.G, self.G.nodes())
+
 
         if self.PREDICTION_MODEL_ALGORITHM == 'SCOTCH':
 
@@ -489,7 +524,17 @@ class GraphPartitioning:
         # TODO add configuration for this
         if self.PARTITIONER_ALGORITHM == 'FENNEL':
             if self.FENNEL_NODE_REORDERING_ENABLED:
-                reordered_batch = utils.reorder_nodes_based_on_leverage_centrality(self.fennel_centrality_reordered_nodes, batch_arrived)
+                if self.FENNEL_NODE_REODERING_SCHEME == 'PII_LH':
+                    reordered_batch = utils.reorder_nodes_based_on_pii_centrality(self.fennel_centrality_reordered_nodes, batch_arrived)
+                elif self.FENNEL_NODE_REODERING_SCHEME == 'LEVERAGE_HL':
+                    reordered_batch = utils.reorder_nodes_based_on_leverage_centrality(self.fennel_centrality_reordered_nodes, batch_arrived)
+                elif self.FENNEL_NODE_REODERING_SCHEME == 'DEGREE_HL':
+                    reordered_batch = utils.reorder_nodes_based_on_degree_centrality(self.fennel_centrality_reordered_nodes, batch_arrived)
+                elif self.FENNEL_NODE_REODERING_SCHEME == 'BOTTLENECK_HL':
+                    # for bottleneck, we must reorder just this batch, because it is extremely slow!
+                    reordered_batch = utils.bottleneck_node_ordering(self.G, batch_arrived)
+                else:
+                    reordered_batch = batch_arrived
                 #print('batch reordering', batch_arrived, reordered_batch)
                 batch_arrived = reordered_batch
             else:
@@ -518,6 +563,8 @@ class GraphPartitioning:
                         self.G.node[node]['weight'] = int(gam_weights[node] * 100)
 
             self.G = self._edge_expansion(self.G)
+
+        self._batches.append(batch_arrived)
 
         # make a subgraph of all arrived nodes
         Gsub = self.G.subgraph(self.nodes_arrived + batch_arrived)

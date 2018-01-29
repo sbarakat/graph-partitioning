@@ -1,6 +1,7 @@
 import os
 import csv
 import gzip
+import math
 import shutil
 import tempfile
 import random
@@ -995,8 +996,18 @@ def fscore_relabel(predictionModel, batch, num_partitions):
 
     return f1_score(predictionModel, relabelled_batch, average='weighted')
 
+def degree_centrality(graph):
+    c = nx.degree_centrality(graph)
+    return sorted(c.items(), key=operator.itemgetter(1),reverse=True)
 
-def leverage_centrality(graph):
+def reorder_nodes_based_on_degree_centrality(degree_scores, batch):
+    ordered_batch = []
+    for score in degree_scores:
+        if score[0] in batch:
+            ordered_batch.append(score[0])
+    return ordered_batch
+
+def leverage_centrality(graph, lonely_at_end = True):
     '''
     The leverage centrality in this paper is defined as a measure of the relationship between
     the degree of a given node (ki) and the degree of each of its neighbors (kj),
@@ -1006,6 +1017,10 @@ def leverage_centrality(graph):
     1. compute degrees of each node (number of edges for each node) (ki)
     2. for each node, compute the mean([ki - kj]/[ki + kj]) for each neighbour j of node i, which is the leverage score
     '''
+
+    lonelyMultiplier = -1
+    if lonely_at_end == False:
+        lonelyMultiplier = 1
 
     n = graph.number_of_nodes()
     k = graph.degree() # returns dict of {node:degree} values
@@ -1026,7 +1041,7 @@ def leverage_centrality(graph):
                 li = li + ((ki - kj) / (ki + kj))
             li = li / ki
         else:
-            li = -1000.0
+            li = lonelyMultiplier * 1000.0
         leverage[n] = li
     return sorted(leverage.items(), key=operator.itemgetter(1),reverse=True)
 
@@ -1045,6 +1060,12 @@ def reorder_nodes_based_on_leverage_centrality(graph_leverage_scores, batch):
         reordered_nodes = reordered_nodes + random.sample(outliers, len(outliers))
     return reordered_nodes
 
+def reorder_nodes_based_on_pii_centrality(pii_node_order, batch):
+    reordered_nodes = []
+    for pii_node in pii_node_order:
+        if pii_node in batch:
+            reordered_nodes.append(pii_node)
+    return reordered_nodes
 
 def infomapCommunityDetection(graph):
     """
@@ -1131,8 +1152,400 @@ def ratherBeSomewhereElseList(graph, assignments, num_partitions):
                     break
     return RBSE
 
-
 def savePredictionFile(outFilePath, assignments):
     with open(outFilePath, 'w+') as f:
         for partition in assignments:
             f.write(str(partition) + '\n')
+
+
+# utility functions for pii
+def pii_relabelGraphNodes(G):
+    # relabels a graph's nodes from 0 - n-1
+    mapping = {}
+    for i, node in enumerate(sorted(G.nodes())):
+        mapping[node] = i
+    newG = nx.relabel_nodes(G, mapping)
+    return (newG, mapping)
+
+def pii_removeAloneNodes(G):
+    alone = []
+    for node in G.nodes():
+        if len(G.neighbors(node)) == 0:
+            alone.append(node)
+            G.remove_node(node)
+    return alone
+
+def pii_splitGraphIntoSubgraphs(G):
+    # finds sub-networks of G
+    sub_networks = nx.k_clique_communities(G, 2)
+    subGraphs = []
+    for subNetwork in sub_networks:
+        subGraph = G.subgraph(list(subNetwork))
+        subGraphs.append(subGraph)
+    return subGraphs
+
+def _prepareGraphForRCentrality(G, batch_nodes):
+    # create a subgraph of the current batch
+    Gsub = G.subgraph(batch_nodes)
+
+    # remove alone nodes
+    alone = pii_removeAloneNodes(Gsub)
+
+    # compute sub-networks
+    subGraphs = pii_splitGraphIntoSubgraphs(Gsub)
+
+    relabelledSubgraphs = []
+    for subG in subGraphs:
+        # remap them
+        subGRelabelled, node_mapping = pii_relabelGraphNodes(subG)
+        relabelledSubgraphs.append([subGRelabelled, node_mapping])
+    return (alone, relabelledSubgraphs)
+
+
+def piiNodeOrder(G, batch_arrivals):
+    '''
+        Takes a full Graph and a batch of arrivals, computing the node order for nodes in the batch
+        using the Political Independence Index
+    '''
+    temp_dir = tempfile.mkdtemp()
+    alone_nodes, subGraphs = _prepareGraphForRCentrality(G, batch_arrivals)
+
+    # CHANGE HERE FOR LONELY NODES AT END
+    #node_order = alone_nodes
+    node_order = []
+
+    ''' For debug purposes only, node accountancy
+    print('size of batch', len(batch_arrivals))
+    print('alone size', len(alone_nodes))
+    for sg in subGraphs:
+        print('graph size:', len(list(sg[1].keys())))
+    '''
+
+    sub_network_pii = []
+    sub_network_nodes = []
+    for Gdata in subGraphs:
+        # for each subnetwork, let's comput the political score
+        GSub = Gdata[0]
+        mapping = Gdata[1]
+
+        edgelist_filepath = os.path.join(temp_dir, 'edgelist.txt')
+        nx.write_edgelist(GSub, edgelist_filepath, data=False)
+
+        piiout_path = os.path.join(temp_dir, 'pii_out')
+
+        with open(piiout_path, 'w+') as logwriter:
+            retval = subprocess.call (["/usr/local/bin/Rscript", '--no-save', os.path.join(os.getcwd(), "pii.r"), "edgelist.txt"], cwd=temp_dir, stdout=logwriter, stderr=subprocess.STDOUT)
+
+        with open(piiout_path, 'r') as fp:
+            magic_code_found = False
+            ordering_failed = False
+            x = []
+            for line in fp:
+                line = line.strip()
+                if(len(line)):
+                    #print(line)
+                    if("#magic_code#" in line):
+                        magic_code_found = True
+                    elif "#magic_end#" in line:
+                        break
+                    elif magic_code_found == True:
+                        if 'NA' in line:
+                            ordering_failed = True
+                            break
+                        elif 'numeric' in line:
+                            ordering_failed = True
+                            break
+                        # parse code
+                        parts = line.split(" ")
+                        for part in parts:
+                            part = part.strip()
+                            if len(part) > 0:
+                                if '[' not in part:
+                                    x.append(float(part))
+            if magic_code_found == False:
+                #print("ERROR: no magic code found.")
+                node_order += list(mapping.keys())
+            elif ordering_failed:
+                #print("ERROR: could not produce pii scores.")
+                node_order += list(mapping.keys())
+            else:
+                sub_network_pii += x
+                sub_network_nodes += list(mapping.keys())
+    # sort
+    node_indeces_LH = sorted(range(len(sub_network_pii)), key=lambda k: sub_network_pii[k])
+    for index in node_indeces_LH:
+        node_order.append(sub_network_nodes[index])
+    shutil.rmtree(temp_dir)
+
+    # CHANGE HERE FOR LONELY NODES AT END
+    return node_order + alone_nodes
+    #return node_order
+
+def bottleneck_node_ordering(G, batch_arrivals):
+    '''
+        Takes a full Graph and a batch of arrivals, computing the node order for nodes in the batch
+        using the Bottleneck Centrality
+    '''
+    temp_dir = tempfile.mkdtemp()
+    alone_nodes, subGraphs = _prepareGraphForRCentrality(G, batch_arrivals)
+
+    # CHANGE HERE FOR LONELY NODES AT END
+    #node_order = alone_nodes # at start
+    node_order = []
+
+
+    sub_network_bottleneck = []
+    sub_network_nodes = []
+    for Gdata in subGraphs:
+        # for each subnetwork, let's comput the political score
+        GSub = Gdata[0]
+        mapping = Gdata[1]
+
+        edgelist_filepath = os.path.join(temp_dir, 'edgelist.txt')
+        nx.write_edgelist(GSub, edgelist_filepath, data=False)
+
+        out_path = os.path.join(temp_dir, 'out')
+
+        with open(out_path, 'w+') as logwriter:
+            retval = subprocess.call (["/usr/local/bin/Rscript", '--no-save', os.path.join(os.getcwd(), "bottleneck.r"), "edgelist.txt"], cwd=temp_dir, stdout=logwriter, stderr=subprocess.STDOUT)
+
+        with open(out_path, 'r') as fp:
+            magic_code_found = False
+            ordering_failed = False
+            x = []
+            for line in fp:
+                line = line.strip()
+                if(len(line)):
+                    #print(line)
+                    if("#magic_code#" in line):
+                        magic_code_found = True
+                    elif "#magic_end#" in line:
+                        break
+                    elif magic_code_found == True:
+                        if 'NA' in line:
+                            ordering_failed = True
+                            break
+                        elif 'numeric' in line:
+                            ordering_failed = True
+                            break
+                        # parse code
+                        parts = line.split(" ")
+                        for part in parts:
+                            part = part.strip()
+                            if len(part) > 0:
+                                if '[' not in part:
+                                    x.append(float(part))
+            if magic_code_found == False:
+                #print("ERROR: no magic code found.")
+                node_order += list(mapping.keys())
+            elif ordering_failed:
+                #print("ERROR: could not produce pii scores.")
+                node_order += list(mapping.keys())
+            else:
+                sub_network_bottleneck += x
+                sub_network_nodes += list(mapping.keys())
+    # sort
+    node_indeces_LH = sorted(range(len(sub_network_bottleneck)), key=lambda k: sub_network_bottleneck[k], reverse=True)
+    for index in node_indeces_LH:
+        node_order.append(sub_network_nodes[index])
+    shutil.rmtree(temp_dir)
+
+    # CHANGE HERE FOR LONELY NODES AT END
+    return node_order + alone_nodes
+
+def _bottleneck_node_ordering(G):
+    temp_dir = tempfile.mkdtemp()
+
+    node_order = []
+
+    x = [] # bottleneck result
+    mapping = {}
+    for i, node in enumerate(sorted(G.nodes())):
+        mapping[i] = node
+
+
+    edgelist_filepath = os.path.join(temp_dir, 'edgelist.txt')
+    nx.write_edgelist(G, edgelist_filepath, data=False)
+
+    outPath = os.path.join(temp_dir, 'out')
+    with open(outPath, 'w+') as logwriter:
+        retval = subprocess.call (["/usr/local/bin/Rscript", '--no-save', os.path.join(os.getcwd(), "bottleneck.r"), "edgelist.txt"], cwd=temp_dir, stdout=logwriter, stderr=subprocess.STDOUT)
+
+    print(temp_dir)
+
+    with open(outPath, 'r') as fp:
+        magic_code_found = False
+        ordering_failed = False
+        for line in fp:
+            line = line.strip()
+            if(len(line)):
+                if("#magic_code#" in line):
+                    magic_code_found = True
+                elif "#magic_end#" in line:
+                    break
+                elif magic_code_found == True:
+                    if 'NA' in line:
+                        ordering_failed = True
+                        break
+                    elif 'numeric' in line:
+                        ordering_failed = True
+                        break
+                    parts = line.split(" ")
+                    print(parts)
+                    for part in parts:
+                        part = part.strip()
+                        if len(part) > 0:
+                            if '[' not in part:
+                                x.append(float(part))
+
+        #if magic_code_found != False and ordering_failed != False:
+        #    node_order = x
+
+
+    node_indeces_LH = sorted(range(len(x)), key=lambda k: x[k])
+    for index in node_indeces_LH:
+        node_order.append(mapping[index])
+
+    shutil.rmtree(temp_dir)
+    return node_order
+
+def add_lonely_nodes_to_graph(graph, percentageOfExtraNodes, additionLocation):
+    '''
+        Valid addition locations: 'before' other nodes or 'after' all other nodes
+    '''
+    number_of_lonely_nodes = math.ceil(graph.number_of_nodes() * percentageOfExtraNodes)
+    if additionLocation == 'before':
+        mapping = {}
+        for node in sorted(graph.nodes()):
+            mapping[node] = node + number_of_lonely_nodes
+
+        nx.relabel_nodes(graph, mapping, copy=False)
+
+    start = 0
+    if additionLocation == 'after':
+        start = graph.number_of_nodes() - 1
+
+    for i in range(start, start + number_of_lonely_nodes):
+        graph.add_node(i, weight=1.0)
+
+    return number_of_lonely_nodes
+
+
+def add_lonely_node_arrivals(arrivals_list, numLonelyNodesToAdd, additionLocation):
+    '''
+        Valid addition locations: 'before' other nodes or 'after' all other nodes
+    '''
+
+    arrivals = []
+    for i in range(0, numLonelyNodesToAdd):
+        arrivals.append(1)
+
+    if additionLocation == 'before':
+        arrivals = arrivals + arrivals_list
+    else:
+        arrivals = arrivals_list + arrivals
+    return arrivals
+
+
+def getNetworkMinMaxCoordinateLocations(path):
+    minX = 1000000.0
+    minY = 1000000.0
+    maxX = -1000000.0
+    maxY= -1000000.0
+
+    with open(path, 'r+') as f:
+        for line in f:
+            line = line.strip()
+            xy = line.split(',')
+            if(len(xy) == 2):
+                x = float(xy[0])
+                y = float(xy[1])
+
+                if x > maxX:
+                    maxX = x
+                if x < minX:
+                    minX = x
+                if y > maxY:
+                    maxY = y
+                if y < minY:
+                    minY = y
+    return [(minX, maxX), (minY, maxY)]
+
+def generateNodeCoordinates(xRange, yRange, numCoordinates):
+    coords = []
+    for i in range(0, numCoordinates):
+        # generate x, y
+        x = random.uniform(xRange[0], xRange[1])
+        y = random.uniform(yRange[0], yRange[1])
+        coords.append((x, y))
+    return coords
+
+class LonelyNodesModifier:
+    def __init__(self, graphPartitioner, percentageToAdd, additionLocation, isEnabled):
+        self.tmpDir = tempfile.mkdtemp()
+        self.gp = graphPartitioner
+        self.isEnabled = isEnabled
+        self.additionLocation = additionLocation
+        self.percentageToAdd = percentageToAdd
+
+    def generateLonelyNodes(self):
+        if self.isEnabled:
+            # update graph
+            self.numLonelyNodesAdded = add_lonely_nodes_to_graph(self.gp.G, self.percentageToAdd, self.additionLocation)
+
+            # update simulated arrivals list
+            self.gp.simulated_arrival_list = add_lonely_node_arrivals(self.gp.simulated_arrival_list, self.numLonelyNodesAdded, self.additionLocation)
+
+            # save simulated arrivals as well
+            self._saveSimulatedFile()
+
+    def _saveSimulatedFile(self):
+        self.origSimulatedPath = self.gp.SIMULATED_ARRIVAL_FILE
+        self.newSimulatedPath = os.path.join(self.tmpDir, 'SIMULATED_ARRIVALS.txt')
+
+        with open(self.newSimulatedPath, 'w+') as outF:
+            if self.additionLocation == 'before':
+                for i in range(0, self.numLonelyNodesAdded):
+                    outF.write('1\n')
+            with open(self.origSimulatedPath, 'r+') as inF:
+                for line in inF:
+                    outF.write(line)
+            if self.additionLocation == 'after':
+                for i in range(0, self.numLonelyNodesAdded):
+                    outF.write('1\n')
+
+        self.gp.SIMULATED_ARRIVAL_FILE = self.newSimulatedPath
+
+
+    def setLonelyCoordinates(self):
+        if self.isEnabled:
+            # get coordinate locations
+            self.xRange, self.yRange = getNetworkMinMaxCoordinateLocations(self.gp.POPULATION_LOCATION_FILE)
+            coords = generateNodeCoordinates(self.xRange, self.yRange, self.numLonelyNodesAdded)
+
+
+            # save coordinate file to right location
+            self.orig_coord_path = self.gp.POPULATION_LOCATION_FILE
+            self.coordPath = os.path.join(self.tmpDir, 'COORDINATES.csv')
+            with open(self.coordPath, 'w') as outF:
+                if self.additionLocation == 'before':
+                    self._writeCoordsToFileStream(coords, outF)
+                with open(self.orig_coord_path) as inF:
+                    for line in inF:
+                        outF.write(line)
+                if self.additionLocation == 'after':
+                    self._writeCoordsToFileStream(coords, outF)
+            self.gp.POPULATION_LOCATION_FILE = self.coordPath
+
+    def _writeCoordToFileAsLine(self, coordinate, fStream):
+            s = str(coordinate[0]) + ',' + str(coordinate[1]) + '\n'
+            fStream.write(s)
+
+    def _writeCoordsToFileStream(self, coordinates, fStream):
+        for coord in coordinates:
+            self._writeCoordToFileAsLine(coord, fStream)
+
+    def __del__(self):
+        if os.path.exists(self.tmpDir):
+            shutil.rmtree(self.tmpDir)
+            #print('LONL', self.tmpDir)

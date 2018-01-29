@@ -199,11 +199,11 @@ class PatohData:
             w2 = hyperedge_edge_weights[edge[1]]
 
             #h = (w1 * w2) ** 0.5
-            #if(w1 > w2):
-            #    h = w1
-            #else:
-            #    h = w2
-            h = (w1 * w2) ** 2
+            if(w1 < w2):
+                h = w1
+            else:
+                h = w2
+            #h = (w1 * w2) ** 2
 
             hWeightsNew.append(h)
 
