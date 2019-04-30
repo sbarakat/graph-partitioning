@@ -2,6 +2,10 @@
 
 This repository contains research into the use of graph partitioning algorithms for assigning people shelters based on their social networks in disaster areas. Many of the ideas that appear here were done in collaboration with Nathaniel Douglass.
 
+Example of nodes arriving at four shelters and the relationships found:
+
+![Animation](animation.gif?raw=true)
+
 ## Initial Setup
 
 The following setup instructions will get the prerequisites installed for running the Jupyter Notebook. These steps assume Ubuntu 16.04 (Xenial Xerus).
